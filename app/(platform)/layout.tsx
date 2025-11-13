@@ -1,6 +1,7 @@
 import type { CSSProperties, ReactNode } from "react"
 
 import { AppSidebar } from "@/components/app-sidebar"
+import { FloatingAssistant } from "@/components/floating-assistant"
 import { SiteHeader } from "@/components/site-header"
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar"
 
@@ -27,6 +28,7 @@ export default function PlatformLayout({
           </main>
         </div>
       </SidebarInset>
+      <FloatingAssistant />
     </SidebarProvider>
   )
 }

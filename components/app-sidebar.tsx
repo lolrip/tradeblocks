@@ -7,6 +7,7 @@ import {
   IconLink,
   IconReportAnalytics,
   IconRouteSquare,
+  IconSettings,
   IconStack2,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
@@ -66,6 +67,11 @@ const navData = {
       href: "/comparison-blocks",
       icon: IconLink,
       badge: "Beta",
+    },
+    {
+      title: "Settings",
+      href: "/settings",
+      icon: IconSettings,
     },
   ],
 };

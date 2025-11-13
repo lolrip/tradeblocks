@@ -13,7 +13,7 @@
 
 // Database configuration
 export const DB_NAME = "TradeBlocksDB";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 // Object store names
 export const STORES = {
@@ -22,6 +22,7 @@ export const STORES = {
   DAILY_LOGS: "dailyLogs",
   CALCULATIONS: "calculations",
   REPORTING_LOGS: "reportingLogs",
+  CONVERSATIONS: "conversations",
 } as const;
 
 // Index names
@@ -34,6 +35,8 @@ export const INDEXES = {
   CALCULATIONS_BY_BLOCK: "blockId",
   REPORTING_LOGS_BY_BLOCK: "blockId",
   REPORTING_LOGS_BY_STRATEGY: "strategy",
+  CONVERSATIONS_BY_CREATED: "createdAt",
+  CONVERSATIONS_BY_UPDATED: "updatedAt",
 } as const;
 
 /**
@@ -155,6 +158,23 @@ export async function initializeDatabase(): Promise<IDBDatabase> {
         calculationsStore.createIndex("calculatedAt", "calculatedAt", {
           unique: false,
         });
+      }
+
+      // Create conversations store (for AI chat history)
+      if (!db.objectStoreNames.contains(STORES.CONVERSATIONS)) {
+        const conversationsStore = db.createObjectStore(STORES.CONVERSATIONS, {
+          keyPath: "id",
+        });
+        conversationsStore.createIndex(
+          INDEXES.CONVERSATIONS_BY_CREATED,
+          "createdAt",
+          { unique: false }
+        );
+        conversationsStore.createIndex(
+          INDEXES.CONVERSATIONS_BY_UPDATED,
+          "updatedAt",
+          { unique: false }
+        );
       }
 
       transaction.oncomplete = () => {
