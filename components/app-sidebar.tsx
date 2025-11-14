@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  IconChartDots,
   IconChartHistogram,
   IconGauge,
   IconLayoutDashboard,
@@ -61,6 +62,12 @@ const navData = {
       title: "Correlation Matrix",
       href: "/correlation-matrix",
       icon: IconChartHistogram,
+    },
+    {
+      title: "Efficient Frontier",
+      href: "/efficient-frontier",
+      icon: IconChartDots,
+      badge: "Beta",
     },
     {
       title: "Comparison Blocks",

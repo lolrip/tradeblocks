@@ -71,8 +71,15 @@ export function BlockAnalyst() {
   const scrollAreaRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Check if API key is configured
-  const apiKeyConfigured = hasApiKey()
+  // Check if API key is configured (client-side only to prevent hydration mismatch)
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false)
+  const [isClientMounted, setIsClientMounted] = useState(false)
+
+  // Initialize client-side only state after mount
+  useEffect(() => {
+    setApiKeyConfigured(hasApiKey())
+    setIsClientMounted(true)
+  }, [])
 
   // Load conversations on mount
   useEffect(() => {
@@ -319,6 +326,23 @@ export function BlockAnalyst() {
     navigator.clipboard.writeText(content)
     setCopiedMessageId(messageId)
     setTimeout(() => setCopiedMessageId(null), 2000)
+  }
+
+  // Show consistent loading state during SSR and initial client render to prevent hydration mismatch
+  if (!isClientMounted) {
+    return (
+      <Card className="h-full flex flex-col">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Bot className="w-5 h-5" />
+            <CardTitle>Strategy Consultant</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="flex-1 flex items-center justify-center">
+          <div className="text-muted-foreground">Loading...</div>
+        </CardContent>
+      </Card>
+    )
   }
 
   // Show API key setup prompt if not configured
