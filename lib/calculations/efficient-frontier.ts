@@ -320,6 +320,66 @@ export function calculatePortfolioMetrics(
 }
 
 /**
+ * Equity curve data point for portfolio simulation
+ */
+export interface EquityCurvePoint {
+  date: string
+  equity: number
+  highWaterMark: number
+  drawdownPct: number
+}
+
+/**
+ * Simulate historical equity curve for a weighted portfolio
+ * Combines strategy returns using given weights to create unified equity curve
+ */
+export function simulateWeightedPortfolioEquity(
+  weights: number[],
+  strategyReturns: number[][],
+  dates: string[],
+  startingCapital: number = 100000
+): EquityCurvePoint[] {
+  const numDates = dates.length
+  const numStrategies = weights.length
+
+  if (numDates === 0 || numStrategies === 0 || strategyReturns.length !== numStrategies) {
+    return []
+  }
+
+  const equityCurve: EquityCurvePoint[] = []
+  let portfolioValue = startingCapital
+  let highWaterMark = startingCapital
+
+  for (let dateIdx = 0; dateIdx < numDates; dateIdx++) {
+    // Calculate weighted portfolio return for this date
+    let portfolioReturn = 0
+    for (let stratIdx = 0; stratIdx < numStrategies; stratIdx++) {
+      portfolioReturn += weights[stratIdx] * strategyReturns[stratIdx][dateIdx]
+    }
+
+    // Update portfolio value
+    portfolioValue *= 1 + portfolioReturn
+
+    // Update high water mark
+    if (portfolioValue > highWaterMark) {
+      highWaterMark = portfolioValue
+    }
+
+    // Calculate drawdown percentage
+    const drawdownPct = highWaterMark > 0 ? ((portfolioValue - highWaterMark) / highWaterMark) * 100 : 0
+
+    equityCurve.push({
+      date: dates[dateIdx],
+      equity: portfolioValue,
+      highWaterMark,
+      drawdownPct,
+    })
+  }
+
+  return equityCurve
+}
+
+/**
  * Identify points on the efficient frontier
  * Uses Pareto frontier approach: a point is efficient if no other point
  * has both higher return AND lower volatility

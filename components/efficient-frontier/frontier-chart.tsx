@@ -9,6 +9,7 @@ interface FrontierChartProps {
   portfolios: PortfolioResult[]
   efficientFrontier: PortfolioResult[]
   selectedPortfolio?: PortfolioResult
+  onPortfolioSelect?: (portfolio: PortfolioResult) => void
   className?: string
 }
 
@@ -30,8 +31,58 @@ export function FrontierChart({
   portfolios,
   efficientFrontier,
   selectedPortfolio,
+  onPortfolioSelect,
   className,
 }: FrontierChartProps) {
+  // Use onInitialized to attach Plotly's native click event
+  const handleInitialized = React.useCallback(
+    (figure: unknown, graphDiv: unknown) => {
+      if (!onPortfolioSelect) {
+        return
+      }
+
+      // Access Plotly's native event system
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const plotlyDiv = graphDiv as any
+
+      if (plotlyDiv && typeof plotlyDiv.on === 'function') {
+        // Attach native Plotly click event
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        plotlyDiv.on('plotly_click', (data: any) => {
+          if (!data.points || data.points.length === 0) {
+            return
+          }
+
+          const point = data.points[0]
+          const curveNumber = point.curveNumber
+          const pointIndex = point.pointIndex
+
+          // Determine which portfolio was clicked based on trace
+          let clickedPortfolio: PortfolioResult | undefined
+
+          if (curveNumber === 0) {
+            // Regular portfolios (first trace)
+            const efficientSet = new Set(efficientFrontier.map(p => JSON.stringify(p.weights)))
+            const regularPortfolios = portfolios.filter(
+              p => !efficientSet.has(JSON.stringify(p.weights))
+            )
+            clickedPortfolio = regularPortfolios[pointIndex]
+          } else if (curveNumber === 1) {
+            // Efficient frontier portfolios (second trace)
+            clickedPortfolio = efficientFrontier[pointIndex]
+          }
+
+          if (clickedPortfolio) {
+            onPortfolioSelect(clickedPortfolio)
+          }
+        })
+      } else {
+        console.warn('[FrontierChart] Could not attach click listener - graphDiv.on not available')
+      }
+    },
+    [portfolios, efficientFrontier, onPortfolioSelect]
+  )
+
   const { plotData, layout } = useMemo(() => {
     if (portfolios.length === 0) {
       return { plotData: [], layout: {} }
@@ -172,6 +223,7 @@ export function FrontierChart({
 
     // Base layout
     const baseLayout: Partial<Layout> = {
+      dragmode: 'pan' as const, // Enable pan mode while supporting clicks
       xaxis: {
         title: { text: 'Annualized Volatility (%)' },
         showgrid: true,
@@ -216,6 +268,7 @@ export function FrontierChart({
       layout={layout}
       style={{ height: "600px" }}
       tooltip={tooltip}
+      onInitialized={handleInitialized}
     />
   )
 }

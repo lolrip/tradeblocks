@@ -48,6 +48,7 @@ interface ChartWrapperProps {
   config?: Partial<Config>;
   onInitialized?: (figure: unknown) => void;
   onUpdate?: (figure: unknown) => void;
+  onClick?: (data: unknown) => void;
   style?: React.CSSProperties;
 }
 
@@ -76,6 +77,7 @@ export function ChartWrapper({
   config,
   onInitialized,
   onUpdate,
+  onClick,
   style = { width: "100%", height: "100%" },
 }: ChartWrapperProps) {
   const { theme } = useTheme();
@@ -197,6 +199,8 @@ export function ChartWrapper({
       },
       autosize: true,
       ...layout,
+      // Preserve dragmode setting if explicitly set
+      ...(layout.dragmode !== undefined && { dragmode: layout.dragmode as Layout['dragmode'] }),
     };
   }, [layout, theme]);
 
@@ -282,6 +286,7 @@ export function ChartWrapper({
               config={enhancedConfig as unknown as Parameters<typeof Plot>[0]['config']}
               onInitialized={onInitialized}
               onUpdate={onUpdate}
+              onClick={onClick}
               style={style}
               className="w-full h-full"
               useResizeHandler={true}

@@ -19,7 +19,7 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
-import { IconDownload, IconCalculator } from "@tabler/icons-react"
+import { IconDownload } from "@tabler/icons-react"
 import type { PortfolioResult } from "@/lib/calculations/efficient-frontier"
 
 interface AllocationDisplayProps {
@@ -29,7 +29,7 @@ interface AllocationDisplayProps {
 
 export function AllocationDisplay({ portfolio, className }: AllocationDisplayProps) {
   const [capital, setCapital] = useState<number>(100000)
-  const [showLotCalculator, setShowLotCalculator] = useState(false)
+  const [showLotCalculator] = useState(true) // Always show calculator
 
   // Sort weights by value (descending)
   const sortedWeights = useMemo(() => {
@@ -122,14 +122,6 @@ export function AllocationDisplay({ portfolio, className }: AllocationDisplayPro
             </CardDescription>
           </div>
           <div className="flex gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setShowLotCalculator(!showLotCalculator)}
-            >
-              <IconCalculator size={16} className="mr-2" />
-              {showLotCalculator ? 'Hide' : 'Show'} Calculator
-            </Button>
             <Button variant="outline" size="sm" onClick={handleExport}>
               <IconDownload size={16} className="mr-2" />
               Export CSV
@@ -237,6 +229,7 @@ export function AllocationDisplay({ portfolio, className }: AllocationDisplayPro
                 step={1000}
                 value={capital}
                 onChange={(e) => setCapital(parseFloat(e.target.value) || 0)}
+                onWheel={(e) => e.currentTarget.blur()}
                 className="w-full"
               />
             </div>
