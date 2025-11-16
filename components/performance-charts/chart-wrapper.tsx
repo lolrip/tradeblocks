@@ -46,8 +46,8 @@ interface ChartWrapperProps {
   data: Data[];
   layout: Partial<Layout>;
   config?: Partial<Config>;
-  onInitialized?: (figure: unknown) => void;
-  onUpdate?: (figure: unknown) => void;
+  onInitialized?: (figure: unknown, graphDiv: unknown) => void;
+  onUpdate?: (figure: unknown, graphDiv: unknown) => void;
   onClick?: (data: unknown) => void;
   style?: React.CSSProperties;
 }
