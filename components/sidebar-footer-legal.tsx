@@ -1,7 +1,6 @@
 "use client";
 
-import { AlertTriangle, Github, ShieldQuestion, Sparkles } from "lucide-react";
-import Image from "next/image";
+import { AlertTriangle, Github, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -53,7 +52,7 @@ export function SidebarFooterLegal() {
             Important Notice
           </AlertTitle>
           <AlertDescription className="text-[0.72rem] text-foreground">
-            Educational use only • Not financial advice • Trading involves risk
+            TradeBlocks builds insights, not investment advice.
           </AlertDescription>
           <Dialog>
             <DialogTrigger asChild>
@@ -101,27 +100,13 @@ export function SidebarFooterLegal() {
           </Dialog>
         </div>
       </Alert>
-      <p className="inline-flex items-center gap-1 text-[0.68rem] italic text-muted-foreground">
-        <Sparkles
-          className="h-3.5 w-3.5 text-muted-foreground/70"
-          aria-hidden
-        />
-        TradeBlocks builds insights, not investment advice.
-      </p>
       <div className="flex flex-wrap items-center gap-2 text-[0.7rem] text-muted-foreground">
         <Link
-          href="https://ninjata.co/"
+          href="https://speakinggreeks.com"
           target="_blank"
           className="inline-flex items-center gap-1 font-medium text-primary transition hover:text-primary/80"
         >
-          Inspired by NinjaTaco
-          <Image
-            src="/ninjataco-tribute.png"
-            alt="NinjaTaco"
-            width={16}
-            height={16}
-            className="opacity-80"
-          />
+          Powered by Speaking Greeks
         </Link>
         <span className="text-muted-foreground/50">•</span>
         <Link
@@ -130,7 +115,7 @@ export function SidebarFooterLegal() {
           className="inline-flex items-center gap-1 transition hover:text-foreground"
         >
           <Github className="h-3.5 w-3.5" aria-hidden />
-          <span className="font-medium">GitHub</span>
+          Forked from tradeblocks
         </Link>
       </div>
     </div>
