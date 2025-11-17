@@ -28,7 +28,7 @@ import {
   type ConversationMessage,
 } from "@/lib/db/chat-store"
 import type { PortfolioStats } from "@/lib/models/portfolio-stats"
-import { getApiKey, getModel, hasApiKey } from "@/lib/utils/llm-service"
+import { getApiKey, getModel, hasApiKey, getProvider, getModelLabel } from "@/lib/utils/llm-service"
 import {
   AlertCircle,
   Bot,
@@ -74,10 +74,16 @@ export function BlockAnalyst() {
   // Check if API key is configured (client-side only to prevent hydration mismatch)
   const [apiKeyConfigured, setApiKeyConfigured] = useState(false)
   const [isClientMounted, setIsClientMounted] = useState(false)
+  const [activeModelLabel, setActiveModelLabel] = useState<string>("")
 
   // Initialize client-side only state after mount
   useEffect(() => {
-    setApiKeyConfigured(hasApiKey())
+    const provider = getProvider()
+    const model = getModel()
+    const modelLabel = getModelLabel(model)
+
+    setApiKeyConfigured(hasApiKey(provider))
+    setActiveModelLabel(modelLabel)
     setIsClientMounted(true)
   }, [])
 
@@ -187,19 +193,23 @@ export function BlockAnalyst() {
         throw new Error("No valid blocks found")
       }
 
+      const provider = getProvider()
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          messages: [...messages, userMessage].map((msg) => ({
-            role: msg.role,
-            content: msg.content,
-          })),
+          messages: [...messages, userMessage]
+            .filter((msg) => msg.content && msg.content.trim() !== '')
+            .map((msg) => ({
+              role: msg.role,
+              content: msg.content,
+            })),
           blockContexts,
-          apiKey: getApiKey(),
+          apiKey: getApiKey(provider),
           model: getModel(),
+          provider,
         }),
       })
 
@@ -361,8 +371,8 @@ export function BlockAnalyst() {
             <div className="space-y-2">
               <h3 className="font-semibold text-lg">API Key Required</h3>
               <p className="text-sm text-muted-foreground">
-                To use the AI Strategy Consultant, you need to configure your OpenAI API key in
-                Settings.
+                To use the AI Strategy Consultant, you need to configure your API key in Settings.
+                Choose between OpenAI or Anthropic providers.
               </p>
             </div>
             <Button asChild>
@@ -408,9 +418,14 @@ export function BlockAnalyst() {
       <CardHeader className="border-b shrink-0">
         <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <Bot className="w-5 h-5" />
               <CardTitle>Strategy Consultant</CardTitle>
+              {isClientMounted && activeModelLabel && (
+                <span className="text-xs font-normal text-muted-foreground bg-muted px-2 py-1 rounded">
+                  {activeModelLabel}
+                </span>
+              )}
             </div>
             <div className="flex items-center gap-2">
               {/* Conversation History Dropdown */}

@@ -1,5 +1,6 @@
 import { streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
+import { createAnthropic } from '@ai-sdk/anthropic'
 import type { PortfolioStats } from '@/lib/models/portfolio-stats'
 
 interface BlockContext {
@@ -22,17 +23,25 @@ interface ChatRequest {
   blockContexts: BlockContext[]
   apiKey: string
   model: string
+  provider: 'openai' | 'anthropic'
 }
 
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatRequest
-    const { messages, blockContexts, apiKey, model } = body
+    const { messages, blockContexts, apiKey, model, provider } = body
 
     // Validate inputs
     if (!apiKey) {
       return new Response(
         JSON.stringify({ error: 'API key is required' }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (!provider || (provider !== 'openai' && provider !== 'anthropic')) {
+      return new Response(
+        JSON.stringify({ error: 'Valid provider (openai or anthropic) is required' }),
         { status: 400, headers: { 'Content-Type': 'application/json' } }
       )
     }
@@ -47,17 +56,23 @@ export async function POST(req: Request) {
     // Build system prompt with block contexts
     const systemPrompt = buildSystemPrompt(blockContexts)
 
-    // Create OpenAI client
-    const openai = createOpenAI({
-      apiKey,
-    })
-
-    // Stream response
-    const result = streamText({
-      model: openai(model),
-      system: systemPrompt,
-      messages,
-    })
+    // Create provider client based on selection
+    let result
+    if (provider === 'openai') {
+      const openai = createOpenAI({ apiKey })
+      result = streamText({
+        model: openai(model),
+        system: systemPrompt,
+        messages,
+      })
+    } else {
+      const anthropic = createAnthropic({ apiKey })
+      result = streamText({
+        model: anthropic(model),
+        system: systemPrompt,
+        messages,
+      })
+    }
 
     return result.toTextStreamResponse()
   } catch (error) {

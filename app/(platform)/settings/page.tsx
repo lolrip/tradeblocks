@@ -19,40 +19,63 @@ import {
   saveModel,
   getModel,
   isValidApiKey,
-  AVAILABLE_MODELS,
-  type OpenAIModel,
+  saveProvider,
+  getProvider,
+  getAvailableModels,
+  type AIProvider,
+  type AIModel,
 } from "@/lib/utils/llm-service"
 import { Eye, EyeOff, Check, AlertCircle, Key, Bot } from "lucide-react"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default function SettingsPage() {
+  const [provider, setProvider] = useState<AIProvider>("openai")
   const [apiKey, setApiKey] = useState("")
   const [showApiKey, setShowApiKey] = useState(false)
-  const [selectedModel, setSelectedModel] = useState<OpenAIModel>("gpt-5-nano")
+  const [selectedModel, setSelectedModel] = useState<AIModel>("gpt-5-nano")
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle")
   const [validationError, setValidationError] = useState<string>("")
 
   // Load saved settings on mount
   useEffect(() => {
-    const savedKey = getApiKey()
+    const savedProvider = getProvider()
+    const savedKey = getApiKey(savedProvider)
     const savedModel = getModel()
 
+    setProvider(savedProvider)
     if (savedKey) {
       setApiKey(savedKey)
     }
     setSelectedModel(savedModel)
   }, [])
 
+  // Update model when provider changes
+  useEffect(() => {
+    const savedKey = getApiKey(provider)
+    const savedModel = getModel()
+
+    if (savedKey) {
+      setApiKey(savedKey)
+    } else {
+      setApiKey("")
+    }
+    setSelectedModel(savedModel)
+    setSaveStatus("idle")
+    setValidationError("")
+  }, [provider])
+
   const handleSaveSettings = () => {
     // Validate API key
-    if (apiKey && !isValidApiKey(apiKey)) {
-      setValidationError("Invalid API key format. OpenAI keys should start with 'sk-'")
+    if (apiKey && !isValidApiKey(apiKey, provider)) {
+      const expectedPrefix = provider === 'openai' ? 'sk-' : 'sk-ant-'
+      setValidationError(`Invalid API key format. ${provider === 'openai' ? 'OpenAI' : 'Anthropic'} keys should start with '${expectedPrefix}'`)
       setSaveStatus("error")
       return
     }
 
     try {
-      // Save to localStorage
-      saveApiKey(apiKey)
+      // Save to localStorage (provider is already saved on tab change)
+      saveApiKey(apiKey, provider)
       saveModel(selectedModel)
 
       setValidationError("")
@@ -68,7 +91,7 @@ export default function SettingsPage() {
 
   const handleClearApiKey = () => {
     setApiKey("")
-    saveApiKey("")
+    saveApiKey("", provider)
     setSaveStatus("idle")
     setValidationError("")
   }
@@ -88,18 +111,33 @@ export default function SettingsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          {/* Provider Selection */}
+          <div className="space-y-2">
+            <Label>AI Provider</Label>
+            <Tabs value={provider} onValueChange={(value) => {
+              const newProvider = value as AIProvider
+              setProvider(newProvider)
+              saveProvider(newProvider)
+            }}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="openai">OpenAI</TabsTrigger>
+                <TabsTrigger value="anthropic">Anthropic</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
+
           {/* API Key Input */}
           <div className="space-y-2">
             <Label htmlFor="api-key" className="flex items-center gap-2">
               <Key className="w-4 h-4" />
-              OpenAI API Key
+              {provider === 'openai' ? 'OpenAI' : 'Anthropic'} API Key
             </Label>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <Input
                   id="api-key"
                   type={showApiKey ? "text" : "password"}
-                  placeholder="sk-..."
+                  placeholder={provider === 'openai' ? 'sk-...' : 'sk-ant-...'}
                   value={apiKey}
                   onChange={(e) => {
                     setApiKey(e.target.value)
@@ -134,12 +172,12 @@ export default function SettingsPage() {
             <p className="text-xs text-muted-foreground">
               Get your API key from{" "}
               <a
-                href="https://platform.openai.com/api-keys"
+                href={provider === 'openai' ? 'https://platform.openai.com/api-keys' : 'https://console.anthropic.com/settings/keys'}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="underline hover:text-foreground transition-colors"
               >
-                platform.openai.com/api-keys
+                {provider === 'openai' ? 'platform.openai.com/api-keys' : 'console.anthropic.com/settings/keys'}
               </a>
             </p>
           </div>
@@ -148,17 +186,18 @@ export default function SettingsPage() {
           <div className="space-y-2">
             <Label htmlFor="model">Model</Label>
             <Select
+              key={provider}
               value={selectedModel}
               onValueChange={(value) => {
-                setSelectedModel(value as OpenAIModel)
+                setSelectedModel(value as AIModel)
                 setSaveStatus("idle")
               }}
             >
               <SelectTrigger id="model">
-                <SelectValue />
+                <SelectValue placeholder="Select a model" />
               </SelectTrigger>
               <SelectContent>
-                {AVAILABLE_MODELS.map((model) => (
+                {getAvailableModels(provider).map((model) => (
                   <SelectItem key={model.value} value={model.value}>
                     <div className="flex flex-col items-start">
                       <span className="font-medium">{model.label}</span>
@@ -171,8 +210,9 @@ export default function SettingsPage() {
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">
-              Choose the model that best fits your needs. GPT-5 Nano is recommended for most
-              users.
+              {provider === 'openai'
+                ? 'Choose the model that best fits your needs. GPT-5 Nano is recommended for most users.'
+                : 'Choose the model that best fits your needs. Claude Haiku 4.5 is recommended for most users.'}
             </p>
           </div>
 
@@ -208,8 +248,8 @@ export default function SettingsPage() {
             <ul className="text-muted-foreground text-xs space-y-1 list-disc list-inside">
               <li>Your API key is stored only in your browser (localStorage)</li>
               <li>We never send your API key to our servers</li>
-              <li>API requests go directly from your browser to OpenAI</li>
-              <li>You can clear your API key at any time</li>
+              <li>API requests go directly from your browser to {provider === 'openai' ? 'OpenAI' : 'Anthropic'}</li>
+              <li>You can switch providers and clear your API keys at any time</li>
             </ul>
           </div>
         </CardContent>
