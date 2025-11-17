@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { BlockAnalyst } from "@/components/block-analyst"
-import { hasApiKey } from "@/lib/utils/llm-service"
+import { hasApiKey, getProvider } from "@/lib/utils/llm-service"
 import { Bot, GripVertical, X } from "lucide-react"
 
 const MIN_WIDTH = 400
@@ -15,7 +15,7 @@ export function FloatingAssistant() {
   const [open, setOpen] = useState(false)
   const [width, setWidth] = useState(DEFAULT_WIDTH)
   const [isResizing, setIsResizing] = useState(false)
-  const apiKeyConfigured = hasApiKey()
+  const [apiKeyConfigured, setApiKeyConfigured] = useState(false)
   const panelRef = useRef<HTMLDivElement>(null)
 
   // Load saved width from localStorage on mount
@@ -27,6 +27,12 @@ export function FloatingAssistant() {
         setWidth(parsedWidth)
       }
     }
+  }, [])
+
+  // Check if API key is configured
+  useEffect(() => {
+    const provider = getProvider()
+    setApiKeyConfigured(hasApiKey(provider))
   }, [])
 
   // Handle resize
