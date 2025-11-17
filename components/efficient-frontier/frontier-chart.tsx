@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useMemo } from "react"
+import React, { useMemo, useRef, useEffect } from "react"
 import { ChartWrapper } from "../performance-charts/chart-wrapper"
 import type { Layout, PlotData } from "plotly.js"
 import type { PortfolioResult } from "@/lib/calculations/efficient-frontier"
@@ -34,6 +34,17 @@ export function FrontierChart({
   onPortfolioSelect,
   className,
 }: FrontierChartProps) {
+  // Use refs to store current portfolio data for the click handler
+  // This avoids stale closure issues since onInitialized only fires once
+  const portfoliosRef = useRef<PortfolioResult[]>([])
+  const efficientFrontierRef = useRef<PortfolioResult[]>([])
+
+  // Keep refs in sync with props
+  useEffect(() => {
+    portfoliosRef.current = portfolios
+    efficientFrontierRef.current = efficientFrontier
+  }, [portfolios, efficientFrontier])
+
   // Use onInitialized to attach Plotly's native click event
   const handleInitialized = React.useCallback(
     (figure: unknown, graphDiv: unknown) => {
@@ -57,19 +68,23 @@ export function FrontierChart({
           const curveNumber = point.curveNumber
           const pointIndex = point.pointIndex
 
+          // Read current portfolio data from refs to avoid stale closure
+          const currentPortfolios = portfoliosRef.current
+          const currentEfficientFrontier = efficientFrontierRef.current
+
           // Determine which portfolio was clicked based on trace
           let clickedPortfolio: PortfolioResult | undefined
 
           if (curveNumber === 0) {
             // Regular portfolios (first trace)
-            const efficientSet = new Set(efficientFrontier.map(p => JSON.stringify(p.weights)))
-            const regularPortfolios = portfolios.filter(
+            const efficientSet = new Set(currentEfficientFrontier.map(p => JSON.stringify(p.weights)))
+            const regularPortfolios = currentPortfolios.filter(
               p => !efficientSet.has(JSON.stringify(p.weights))
             )
             clickedPortfolio = regularPortfolios[pointIndex]
           } else if (curveNumber === 1) {
             // Efficient frontier portfolios (second trace)
-            clickedPortfolio = efficientFrontier[pointIndex]
+            clickedPortfolio = currentEfficientFrontier[pointIndex]
           }
 
           if (clickedPortfolio) {
@@ -80,7 +95,7 @@ export function FrontierChart({
         console.warn('[FrontierChart] Could not attach click listener - graphDiv.on not available')
       }
     },
-    [portfolios, efficientFrontier, onPortfolioSelect]
+    [onPortfolioSelect] // portfolios and efficientFrontier are read from refs, not closure
   )
 
   const { plotData, layout } = useMemo(() => {
