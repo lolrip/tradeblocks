@@ -14,6 +14,28 @@ import { Trade } from '../models/trade'
 import { DEFAULT_ANALYSIS_CONFIG } from './portfolio-stats'
 
 /**
+ * Simple LCG (Linear Congruential Generator) for reproducibility
+ * Creates a seeded pseudo-random number generator
+ *
+ * @param seed - Integer seed value
+ * @returns Function that returns random numbers in [0, 1)
+ */
+function createSeededRandom(seed: number): () => number {
+  let state = seed
+  return function () {
+    // LCG parameters from Numerical Recipes
+    state = (state * 1664525 + 1013904223) % 4294967296
+    return state / 4294967296
+  }
+}
+
+/**
+ * Default seed for reproducible optimization results
+ * Using 42 as it's the answer to everything
+ */
+const DEFAULT_RANDOM_SEED = 42
+
+/**
  * Configuration for portfolio constraints
  */
 export interface PortfolioConstraints {
@@ -64,6 +86,35 @@ export interface PortfolioResult {
 }
 
 /**
+ * Helper function to safely extract numeric fundsAtClose value
+ * Detects and handles data corruption (Date objects, timestamps, invalid numbers)
+ */
+function getNumericFundsAtClose(trade: Trade, context: string): number {
+  const funds = trade.fundsAtClose
+
+  // Handle Date objects (should never happen but IndexedDB can cause this)
+  if (funds instanceof Date) {
+    console.warn(`[${context}] Data corruption detected: fundsAtClose is a Date object for trade on ${trade.dateOpened}`)
+    return NaN
+  }
+
+  // Handle timestamp numbers (likely corruption if > 1 billion)
+  // Normal fundsAtClose should be portfolio value like $10,000 to $10,000,000
+  if (typeof funds === 'number' && funds > 1_000_000_000) {
+    console.warn(`[${context}] Suspicious fundsAtClose value (${funds}) - appears to be a timestamp. Trade date: ${trade.dateOpened}`)
+    return NaN
+  }
+
+  // Normal case: valid finite number
+  if (typeof funds === 'number' && isFinite(funds) && funds > 0) {
+    return funds
+  }
+
+  // Invalid or missing
+  return NaN
+}
+
+/**
  * Extract daily returns for each strategy from trades
  * Groups trades by strategy and date, then calculates equity curve returns
  */
@@ -105,7 +156,11 @@ export function extractStrategyReturns(trades: Trade[]): StrategyReturns[] {
     })
 
     // Calculate initial portfolio value for this strategy
-    let portfolioValue = sortedTrades[0]?.fundsAtClose - sortedTrades[0]?.pl || 10000
+    const firstTradeFunds = getNumericFundsAtClose(sortedTrades[0], `Strategy: ${strategy}`)
+    const firstTradePl = sortedTrades[0]?.pl || 0
+    let portfolioValue = !isNaN(firstTradeFunds) && firstTradeFunds > firstTradePl
+      ? firstTradeFunds - firstTradePl
+      : 10000 // Fallback to $10,000 if data is corrupted or missing
 
     // Convert P&L to returns
     const dates: string[] = []
@@ -166,11 +221,18 @@ export function alignStrategyReturns(
 /**
  * Generate random portfolio weights that satisfy constraints
  * Uses iterative normalization to respect min/max bounds while summing to 1
+ *
+ * @param numStrategies - Number of strategies to allocate weights to
+ * @param constraints - Portfolio constraints (min/max weights, etc.)
+ * @param seed - Optional seed for reproducible results (uses DEFAULT_RANDOM_SEED if not provided)
  */
 export function generateRandomWeights(
   numStrategies: number,
-  constraints: PortfolioConstraints = DEFAULT_CONSTRAINTS
+  constraints: PortfolioConstraints = DEFAULT_CONSTRAINTS,
+  seed?: number
 ): number[] {
+  // Create RNG - use seed if provided, otherwise use DEFAULT_RANDOM_SEED
+  const rng = createSeededRandom(seed ?? DEFAULT_RANDOM_SEED)
   if (constraints.fullyInvested) {
     // Generate random weights using Dirichlet distribution approximation
     const maxIterations = 100
@@ -179,7 +241,7 @@ export function generateRandomWeights(
     while (iteration < maxIterations) {
       const gammaValues: number[] = []
       for (let i = 0; i < numStrategies; i++) {
-        gammaValues.push(-Math.log(Math.random()))
+        gammaValues.push(-Math.log(rng()))
       }
       const sum = gammaValues.reduce((a, b) => a + b, 0)
 
@@ -261,7 +323,7 @@ export function generateRandomWeights(
     // Generate independent random weights
     const weights: number[] = []
     for (let i = 0; i < numStrategies; i++) {
-      const weight = Math.random() * (constraints.maxWeight - constraints.minWeight) + constraints.minWeight
+      const weight = rng() * (constraints.maxWeight - constraints.minWeight) + constraints.minWeight
       weights.push(weight)
     }
     return weights
@@ -422,13 +484,21 @@ export function identifyEfficientFrontier(portfolios: PortfolioResult[]): Portfo
 /**
  * Run Monte Carlo simulation to generate random portfolios
  * This is the main function that should be called from the web worker
+ *
+ * @param strategyReturns - Returns data for each strategy
+ * @param numSimulations - Number of random portfolios to generate
+ * @param constraints - Portfolio constraints
+ * @param riskFreeRate - Risk-free rate for Sharpe ratio calculation
+ * @param progressCallback - Optional callback for progress updates
+ * @param seed - Optional seed for reproducible results (uses DEFAULT_RANDOM_SEED if not provided)
  */
 export function runMonteCarloSimulation(
   strategyReturns: StrategyReturns[],
   numSimulations: number = 2000,
   constraints: PortfolioConstraints = DEFAULT_CONSTRAINTS,
   riskFreeRate: number = DEFAULT_ANALYSIS_CONFIG.riskFreeRate,
-  progressCallback?: (progress: number, portfolio: PortfolioResult) => void
+  progressCallback?: (progress: number, portfolio: PortfolioResult) => void,
+  seed?: number
 ): PortfolioResult[] {
   // Align returns to common dates
   const { strategies, returns } = alignStrategyReturns(strategyReturns)
@@ -439,10 +509,12 @@ export function runMonteCarloSimulation(
   }
 
   const portfolios: PortfolioResult[] = []
+  const baseSeed = seed ?? DEFAULT_RANDOM_SEED
 
   for (let i = 0; i < numSimulations; i++) {
-    // Generate random weights
-    const weightsArray = generateRandomWeights(numStrategies, constraints)
+    // Generate random weights with unique seed per simulation
+    const simulationSeed = baseSeed + i
+    const weightsArray = generateRandomWeights(numStrategies, constraints, simulationSeed)
 
     // Convert to dictionary
     const weights: Record<string, number> = {}

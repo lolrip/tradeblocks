@@ -49,6 +49,7 @@ export default function EfficientFrontierPage() {
   const [selectedStrategies, setSelectedStrategies] = useState<string[]>([])
   const [constraints, setConstraints] = useState<PortfolioConstraints>(DEFAULT_CONSTRAINTS)
   const [numSimulations, setNumSimulations] = useState(2000)
+  const [randomSeed, setRandomSeed] = useState<number | undefined>(undefined)
 
   // Results state
   const [portfolios, setPortfolios] = useState<PortfolioResult[]>([])
@@ -200,6 +201,10 @@ export default function EfficientFrontierPage() {
       return
     }
 
+    // CRITICAL: Sort by strategy name to ensure consistent ordering
+    // This prevents non-deterministic results when the same random seed is used
+    selectedReturns.sort((a, b) => a.strategy.localeCompare(b.strategy))
+
     // Reset state
     setPortfolios([])
     setEfficientFrontier([])
@@ -214,10 +219,12 @@ export default function EfficientFrontierPage() {
     // Send optimization request to worker
     const request: OptimizationRequest = {
       type: 'start',
+      mode: 'strategy',
       strategyReturns: selectedReturns,
       numSimulations,
       constraints,
       riskFreeRate,
+      randomSeed,
     }
 
     workerRef.current.postMessage(request)
@@ -226,6 +233,7 @@ export default function EfficientFrontierPage() {
     selectedStrategies,
     numSimulations,
     constraints,
+    randomSeed,
   ])
 
   // Reset optimization
@@ -333,6 +341,8 @@ export default function EfficientFrontierPage() {
           onConstraintsChange={setConstraints}
           numSimulations={numSimulations}
           onNumSimulationsChange={setNumSimulations}
+          randomSeed={randomSeed}
+          onRandomSeedChange={setRandomSeed}
           onRunOptimization={handleRunOptimization}
           onReset={handleReset}
           isOptimizing={false}
@@ -382,6 +392,8 @@ export default function EfficientFrontierPage() {
         onConstraintsChange={setConstraints}
         numSimulations={numSimulations}
         onNumSimulationsChange={setNumSimulations}
+        randomSeed={randomSeed}
+        onRandomSeedChange={setRandomSeed}
         onRunOptimization={handleRunOptimization}
         onReset={handleReset}
         isOptimizing={isOptimizing}

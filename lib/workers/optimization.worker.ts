@@ -4,8 +4,11 @@
  * Runs Monte Carlo simulation for portfolio optimization in a background thread
  * to prevent blocking the main UI thread during intensive calculations.
  *
+ * Supports both strategy-level and block-level optimization using the same
+ * Monte Carlo algorithm.
+ *
  * Message Protocol:
- * - Input: OptimizationRequest with strategy returns and configuration
+ * - Input: OptimizationRequest with strategy/block returns and configuration
  * - Output: Stream of ProgressUpdate messages with portfolio results
  * - Final: CompletionMessage with all portfolios and efficient frontier
  */
@@ -19,16 +22,42 @@ import {
   DEFAULT_CONSTRAINTS,
 } from '../calculations/efficient-frontier'
 
+import {
+  runBlockMonteCarloSimulation,
+  type BlockReturns,
+  type BlockOptimizationConfig,
+  DEFAULT_BLOCK_CONFIG,
+} from '../calculations/block-efficient-frontier'
+
 /**
- * Request message to start optimization
+ * Request message to start strategy-level optimization
  */
-export interface OptimizationRequest {
+export interface StrategyOptimizationRequest {
   type: 'start'
+  mode: 'strategy'
   strategyReturns: StrategyReturns[]
   numSimulations: number
   constraints?: PortfolioConstraints
   riskFreeRate?: number
+  randomSeed?: number
 }
+
+/**
+ * Request message to start block-level optimization
+ */
+export interface BlockOptimizationRequest {
+  type: 'start'
+  mode: 'block'
+  blockReturns: BlockReturns[]
+  numSimulations: number
+  config?: BlockOptimizationConfig
+  randomSeed?: number
+}
+
+/**
+ * Union type for all optimization requests
+ */
+export type OptimizationRequest = StrategyOptimizationRequest | BlockOptimizationRequest
 
 /**
  * Progress update message with latest portfolio
@@ -81,22 +110,7 @@ self.onmessage = (event: MessageEvent<OptimizationRequest>) => {
 
   try {
     const startTime = performance.now()
-
-    // Validate input
-    if (!request.strategyReturns || request.strategyReturns.length < 2) {
-      const error: ErrorMessage = {
-        type: 'error',
-        error: 'Insufficient strategies',
-        details: 'At least 2 strategies are required for optimization',
-      }
-      self.postMessage(error)
-      return
-    }
-
     const numSimulations = request.numSimulations || 2000
-    const constraints = request.constraints || DEFAULT_CONSTRAINTS
-    const riskFreeRate = request.riskFreeRate || 2.0
-
     let currentSimulation = 0
 
     // Progress callback to send updates to main thread
@@ -114,14 +128,61 @@ self.onmessage = (event: MessageEvent<OptimizationRequest>) => {
       self.postMessage(update)
     }
 
-    // Run the simulation
-    const portfolios = runMonteCarloSimulation(
-      request.strategyReturns,
-      numSimulations,
-      constraints,
-      riskFreeRate,
-      progressCallback
-    )
+    let portfolios: PortfolioResult[]
+
+    if (request.mode === 'strategy') {
+      // Strategy-level optimization
+      if (!request.strategyReturns || request.strategyReturns.length < 2) {
+        const error: ErrorMessage = {
+          type: 'error',
+          error: 'Insufficient strategies',
+          details: 'At least 2 strategies are required for optimization',
+        }
+        self.postMessage(error)
+        return
+      }
+
+      const constraints = request.constraints || DEFAULT_CONSTRAINTS
+      const riskFreeRate = request.riskFreeRate || 2.0
+
+      portfolios = runMonteCarloSimulation(
+        request.strategyReturns,
+        numSimulations,
+        constraints,
+        riskFreeRate,
+        progressCallback,
+        request.randomSeed
+      )
+    } else if (request.mode === 'block') {
+      // Block-level optimization
+      if (!request.blockReturns || request.blockReturns.length < 2) {
+        const error: ErrorMessage = {
+          type: 'error',
+          error: 'Insufficient blocks',
+          details: 'At least 2 blocks are required for optimization',
+        }
+        self.postMessage(error)
+        return
+      }
+
+      const config = request.config || DEFAULT_BLOCK_CONFIG
+
+      portfolios = runBlockMonteCarloSimulation(
+        request.blockReturns,
+        config,
+        numSimulations,
+        progressCallback,
+        request.randomSeed
+      )
+    } else {
+      const error: ErrorMessage = {
+        type: 'error',
+        error: 'Invalid mode',
+        details: `Expected 'strategy' or 'block', got unknown mode`,
+      }
+      self.postMessage(error)
+      return
+    }
 
     // Identify efficient frontier
     const efficientFrontier = identifyEfficientFrontier(portfolios)

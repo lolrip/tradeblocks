@@ -477,6 +477,92 @@ describe('Efficient Frontier Calculations', () => {
 
       expect(portfolios).toHaveLength(0)
     })
+
+    it('should produce deterministic results with same seed', () => {
+      const strategyReturns = extractStrategyReturns(mockTrades)
+      const numSimulations = 50
+      const seed = 12345
+
+      // Run simulation twice with same seed
+      const portfolios1 = runMonteCarloSimulation(
+        strategyReturns,
+        numSimulations,
+        DEFAULT_CONSTRAINTS,
+        2.0,
+        undefined,
+        seed
+      )
+
+      const portfolios2 = runMonteCarloSimulation(
+        strategyReturns,
+        numSimulations,
+        DEFAULT_CONSTRAINTS,
+        2.0,
+        undefined,
+        seed
+      )
+
+      // Results should be identical
+      expect(portfolios1).toHaveLength(numSimulations)
+      expect(portfolios2).toHaveLength(numSimulations)
+
+      portfolios1.forEach((portfolio1, index) => {
+        const portfolio2 = portfolios2[index]
+
+        // Compare all weights
+        const strategies = Object.keys(portfolio1.weights)
+        strategies.forEach(strategy => {
+          expect(portfolio2.weights[strategy]).toBeCloseTo(portfolio1.weights[strategy], 10)
+        })
+
+        // Compare metrics
+        expect(portfolio2.annualizedReturn).toBeCloseTo(portfolio1.annualizedReturn, 10)
+        expect(portfolio2.annualizedVolatility).toBeCloseTo(portfolio1.annualizedVolatility, 10)
+        expect(portfolio2.sharpeRatio).toBeCloseTo(portfolio1.sharpeRatio, 10)
+      })
+    })
+
+    it('should produce different results with different seeds', () => {
+      const strategyReturns = extractStrategyReturns(mockTrades)
+      const numSimulations = 50
+
+      // Run simulation with different seeds
+      const portfolios1 = runMonteCarloSimulation(
+        strategyReturns,
+        numSimulations,
+        DEFAULT_CONSTRAINTS,
+        2.0,
+        undefined,
+        12345
+      )
+
+      const portfolios2 = runMonteCarloSimulation(
+        strategyReturns,
+        numSimulations,
+        DEFAULT_CONSTRAINTS,
+        2.0,
+        undefined,
+        54321
+      )
+
+      expect(portfolios1).toHaveLength(numSimulations)
+      expect(portfolios2).toHaveLength(numSimulations)
+
+      // At least some portfolios should be different
+      let differenceFound = false
+      for (let i = 0; i < numSimulations; i++) {
+        const strategies = Object.keys(portfolios1[i].weights)
+        for (const strategy of strategies) {
+          if (Math.abs(portfolios1[i].weights[strategy] - portfolios2[i].weights[strategy]) > 0.0001) {
+            differenceFound = true
+            break
+          }
+        }
+        if (differenceFound) break
+      }
+
+      expect(differenceFound).toBe(true)
+    })
   })
 
   describe('calculateCovarianceMatrix', () => {

@@ -18,59 +18,53 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
 import { IconChevronDown, IconSettings, IconRefresh } from "@tabler/icons-react"
 import type { PortfolioConstraints } from "@/lib/calculations/efficient-frontier"
+import type { DateAlignmentMode } from "@/lib/calculations/block-efficient-frontier"
 
-interface OptimizationControlsProps {
-  strategies: string[]
-  selectedStrategies: string[]
-  onSelectedStrategiesChange: (strategies: string[]) => void
+interface BlockOptimizationControlsProps {
   constraints: PortfolioConstraints
   onConstraintsChange: (constraints: PortfolioConstraints) => void
+  dateAlignment: DateAlignmentMode
+  onDateAlignmentChange: (mode: DateAlignmentMode) => void
   numSimulations: number
   onNumSimulationsChange: (num: number) => void
-  randomSeed?: number
-  onRandomSeedChange?: (seed: number | undefined) => void
+  totalCapital: number
+  onTotalCapitalChange: (capital: number) => void
+  riskFreeRate: number
+  onRiskFreeRateChange: (rate: number) => void
   onRunOptimization: () => void
   onReset: () => void
   isOptimizing: boolean
   disabled?: boolean
+  canOptimize: boolean
 }
 
-export function OptimizationControls({
-  strategies,
-  selectedStrategies,
-  onSelectedStrategiesChange,
+export function BlockOptimizationControls({
   constraints,
   onConstraintsChange,
+  dateAlignment,
+  onDateAlignmentChange,
   numSimulations,
   onNumSimulationsChange,
-  randomSeed,
-  onRandomSeedChange,
+  totalCapital,
+  onTotalCapitalChange,
+  riskFreeRate,
+  onRiskFreeRateChange,
   onRunOptimization,
   onReset,
   isOptimizing,
   disabled = false,
-}: OptimizationControlsProps) {
+  canOptimize,
+}: BlockOptimizationControlsProps) {
   const [isAdvancedOpen, setIsAdvancedOpen] = useState(false)
-
-  const handleStrategyToggle = (strategy: string, checked: boolean) => {
-    if (checked) {
-      onSelectedStrategiesChange([...selectedStrategies, strategy])
-    } else {
-      onSelectedStrategiesChange(selectedStrategies.filter(s => s !== strategy))
-    }
-  }
-
-  const handleSelectAll = () => {
-    onSelectedStrategiesChange(strategies)
-  }
-
-  const handleDeselectAll = () => {
-    onSelectedStrategiesChange([])
-  }
-
-  const canOptimize = selectedStrategies.length >= 2 && !isOptimizing && !disabled
 
   return (
     <Card>
@@ -80,74 +74,74 @@ export function OptimizationControls({
           Optimization Settings
         </CardTitle>
         <CardDescription>
-          Configure strategies and constraints for portfolio optimization
+          Configure constraints and parameters for block-level portfolio optimization
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        {/* Strategy Selection */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <Label className="text-base font-semibold">
-              Select Strategies ({selectedStrategies.length}/{strategies.length})
-            </Label>
-            <div className="flex gap-2">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleSelectAll}
-                disabled={disabled || isOptimizing}
-              >
-                Select All
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDeselectAll}
-                disabled={disabled || isOptimizing}
-              >
-                Clear
-              </Button>
-            </div>
+        {/* Date Alignment Strategy */}
+        <div className="space-y-2">
+          <Label htmlFor="date-alignment">Date Alignment Strategy</Label>
+          <Select
+            value={dateAlignment}
+            onValueChange={(value) => onDateAlignmentChange(value as DateAlignmentMode)}
+            disabled={disabled || isOptimizing}
+          >
+            <SelectTrigger id="date-alignment">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="overlapping">
+                Overlapping Dates Only (Recommended)
+              </SelectItem>
+              <SelectItem value="zero-padding">
+                All Dates (Zero-Padding)
+              </SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {dateAlignment === 'overlapping' ? (
+              <>
+                Uses only dates where all blocks have trades. More accurate correlations
+                but requires overlapping trading periods.
+              </>
+            ) : (
+              <>
+                Uses all dates from all blocks, filling missing days with 0% return.
+                Includes all data but may affect correlation accuracy.
+              </>
+            )}
+          </p>
+        </div>
+
+        {/* Total Capital */}
+        <div className="space-y-2">
+          <Label htmlFor="total-capital">
+            Total Portfolio Capital
+          </Label>
+          <div className="relative">
+            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+              $
+            </span>
+            <Input
+              id="total-capital"
+              type="number"
+              min={1000}
+              step={1000}
+              value={totalCapital}
+              onChange={(e) => onTotalCapitalChange(parseFloat(e.target.value) || 100000)}
+              disabled={disabled || isOptimizing}
+              className="pl-6"
+            />
           </div>
-
-          {strategies.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              No strategies found. Please ensure your trades have strategy labels.
-            </p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {strategies.map(strategy => (
-                <div key={strategy} className="flex items-center space-x-2">
-                  <Checkbox
-                    id={`strategy-${strategy}`}
-                    checked={selectedStrategies.includes(strategy)}
-                    onCheckedChange={(checked) =>
-                      handleStrategyToggle(strategy, checked as boolean)
-                    }
-                    disabled={disabled || isOptimizing}
-                  />
-                  <label
-                    htmlFor={`strategy-${strategy}`}
-                    className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                  >
-                    {strategy}
-                  </label>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {selectedStrategies.length < 2 && strategies.length >= 2 && (
-            <p className="text-sm text-amber-600 dark:text-amber-500">
-              ⚠️ Select at least 2 strategies to run optimization
-            </p>
-          )}
+          <p className="text-xs text-muted-foreground">
+            Used to display dollar allocations alongside percentage weights
+          </p>
         </div>
 
         {/* Number of Simulations */}
         <div className="space-y-2">
           <Label htmlFor="num-simulations">
-            Number of Simulations: <span className="font-mono">{numSimulations}</span>
+            Number of Simulations: <span className="font-mono">{numSimulations.toLocaleString()}</span>
           </Label>
           <Input
             id="num-simulations"
@@ -177,10 +171,31 @@ export function OptimizationControls({
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-4 pt-4">
+            {/* Risk-Free Rate */}
+            <div className="space-y-2">
+              <Label htmlFor="risk-free-rate">
+                Risk-Free Rate:{' '}
+                <span className="font-mono">{riskFreeRate.toFixed(2)}%</span>
+              </Label>
+              <Input
+                id="risk-free-rate"
+                type="number"
+                min={0}
+                max={10}
+                step={0.1}
+                value={riskFreeRate}
+                onChange={(e) => onRiskFreeRateChange(parseFloat(e.target.value) || 2.0)}
+                disabled={disabled || isOptimizing}
+              />
+              <p className="text-xs text-muted-foreground">
+                Annual risk-free rate for Sharpe ratio calculation (typically 2-5%)
+              </p>
+            </div>
+
             {/* Min Weight */}
             <div className="space-y-2">
               <Label>
-                Minimum Weight per Strategy:{' '}
+                Minimum Weight per Block:{' '}
                 <span className="font-mono">{(constraints.minWeight * 100).toFixed(0)}%</span>
               </Label>
               <Slider
@@ -194,14 +209,14 @@ export function OptimizationControls({
                 disabled={disabled || isOptimizing}
               />
               <p className="text-xs text-muted-foreground">
-                Minimum allocation per strategy (0% = allow zero allocation)
+                Minimum allocation per block (0% = allow zero allocation)
               </p>
             </div>
 
             {/* Max Weight */}
             <div className="space-y-2">
               <Label>
-                Maximum Weight per Strategy:{' '}
+                Maximum Weight per Block:{' '}
                 <span className="font-mono">{(constraints.maxWeight * 100).toFixed(0)}%</span>
               </Label>
               <Slider
@@ -215,7 +230,7 @@ export function OptimizationControls({
                 disabled={disabled || isOptimizing}
               />
               <p className="text-xs text-muted-foreground">
-                Maximum allocation per strategy (prevents over-concentration)
+                Maximum allocation per block (prevents over-concentration)
               </p>
             </div>
 
@@ -254,28 +269,6 @@ export function OptimizationControls({
                 Allow Leverage (weights can sum &gt; 100%)
               </label>
             </div>
-
-            {/* Random Seed */}
-            <div className="space-y-2">
-              <Label htmlFor="random-seed">
-                Random Seed (optional)
-              </Label>
-              <Input
-                id="random-seed"
-                type="number"
-                value={randomSeed ?? ''}
-                onChange={(e) => {
-                  const value = e.target.value
-                  onRandomSeedChange?.(value ? parseInt(value) : undefined)
-                }}
-                placeholder="Leave empty for default (42)"
-                disabled={disabled || isOptimizing}
-                className="w-full"
-              />
-              <p className="text-xs text-muted-foreground">
-                Set a seed for reproducible results. Uses seed 42 by default for consistency.
-              </p>
-            </div>
           </CollapsibleContent>
         </Collapsible>
 
@@ -283,7 +276,7 @@ export function OptimizationControls({
         <div className="flex gap-3 pt-4">
           <Button
             onClick={onRunOptimization}
-            disabled={!canOptimize}
+            disabled={!canOptimize || disabled}
             className="flex-1"
             size="lg"
           >

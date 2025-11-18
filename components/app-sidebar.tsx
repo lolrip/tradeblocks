@@ -1,7 +1,9 @@
 "use client";
 
 import {
+  IconChartArea,
   IconChartDots,
+  IconChartDots3,
   IconChartHistogram,
   IconGauge,
   IconLayoutDashboard,
@@ -10,6 +12,7 @@ import {
   IconRouteSquare,
   IconSettings,
   IconStack2,
+  IconTarget,
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
 import Link from "next/link";
@@ -67,6 +70,23 @@ const navData = {
       title: "Efficient Frontier",
       href: "/efficient-frontier",
       icon: IconChartDots,
+      badge: "Beta",
+    },
+    {
+      title: "Monte Carlo Simulator",
+      href: "/monte-carlo",
+      icon: IconChartArea,
+    },
+    {
+      title: "Block Optimizer",
+      href: "/block-optimizer",
+      icon: IconChartDots3,
+      badge: "Beta",
+    },
+    {
+      title: "Portfolio Optimizer",
+      href: "/portfolio-optimizer",
+      icon: IconTarget,
       badge: "Beta",
     },
     {

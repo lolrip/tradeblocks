@@ -193,7 +193,21 @@ export function BlockAnalyst() {
         throw new Error("No valid blocks found")
       }
 
+      // Fetch trades data for tool use (for Anthropic models)
+      const tradesData: Record<string, Trade[]> = {}
       const provider = getProvider()
+
+      if (provider === 'anthropic') {
+        for (const blockId of selectedBlockIds) {
+          try {
+            const trades = await getTradesByBlock(blockId)
+            tradesData[blockId] = trades
+          } catch (error) {
+            console.error(`Failed to load trades for block ${blockId}:`, error)
+          }
+        }
+      }
+
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
@@ -207,6 +221,8 @@ export function BlockAnalyst() {
               content: msg.content,
             })),
           blockContexts,
+          blockIds: selectedBlockIds, // Pass block IDs for tool use
+          tradesData, // Pass pre-fetched trades data for tool use
           apiKey: getApiKey(provider),
           model: getModel(),
           provider,
