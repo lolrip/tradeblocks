@@ -1,9 +1,6 @@
 import { streamText } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
-import Anthropic from '@anthropic-ai/sdk'
 import type { PortfolioStats } from '@/lib/models/portfolio-stats'
-import { ALL_TRADE_TOOLS } from '@/lib/ai/trade-tools'
-import type { Trade } from '@/lib/models/trade'
 
 interface BlockContext {
   blockName: string
@@ -23,189 +20,16 @@ interface ChatRequest {
     content: string
   }>
   blockContexts: BlockContext[]
-  blockIds: string[] // Array of block IDs for tool use
-  tradesData?: Record<string, Trade[]> // Pre-fetched trades data keyed by block ID
+  blockIds: string[] // Array of block IDs for reference
   apiKey: string
   model: string
   provider: 'openai' | 'anthropic'
 }
 
-/**
- * Format trade for AI consumption (simplified version with key fields)
- */
-function formatTradeForAI(trade: Trade) {
-  return {
-    dateOpened: trade.dateOpened,
-    dateClosed: trade.dateClosed,
-    strategy: trade.strategy,
-    pl: trade.pl,
-    premium: trade.premium,
-    reasonForClose: trade.reasonForClose,
-    numContracts: trade.numContracts,
-    fundsAtClose: trade.fundsAtClose,
-    marginReq: trade.marginReq,
-    openingCommissionsFees: trade.openingCommissionsFees,
-    closingCommissionsFees: trade.closingCommissionsFees,
-    openingVix: trade.openingVix,
-    closingVix: trade.closingVix,
-    maxProfit: trade.maxProfit,
-    maxLoss: trade.maxLoss,
-  }
-}
-
-/**
- * Execute a tool call using pre-fetched trades data
- */
-function executeTool(
-  toolName: string,
-  toolInput: Record<string, unknown>,
-  tradesData: Record<string, Trade[]>
-): string {
-  try {
-    const MAX_TRADES_LIMIT = 100
-
-    switch (toolName) {
-      case 'get_trades_by_block': {
-        const { block_id, limit = 100, offset = 0 } = toolInput as { block_id: string; limit?: number; offset?: number }
-        const allTrades = tradesData[block_id] || []
-        const limitedTrades = allTrades.slice(Number(offset), Number(offset) + Math.min(Number(limit), MAX_TRADES_LIMIT))
-
-        return JSON.stringify({
-          block_id,
-          total_trades: allTrades.length,
-          returned_trades: limitedTrades.length,
-          offset,
-          trades: limitedTrades.map(formatTradeForAI),
-        }, null, 2)
-      }
-
-      case 'get_trades_by_strategy': {
-        const { block_id, strategy_name, limit = 100 } = toolInput as { block_id: string; strategy_name: string; limit?: number }
-        const allTrades = tradesData[block_id] || []
-        const trades = allTrades.filter(t => t.strategy === strategy_name)
-        const limitedTrades = trades.slice(0, Math.min(Number(limit), MAX_TRADES_LIMIT))
-
-        return JSON.stringify({
-          block_id,
-          strategy_name,
-          total_trades: trades.length,
-          returned_trades: limitedTrades.length,
-          trades: limitedTrades.map(formatTradeForAI),
-        }, null, 2)
-      }
-
-      case 'search_trades': {
-        const { block_id, date_from, date_to, min_pl, max_pl, outcome, limit = 100 } = toolInput as {
-          block_id: string
-          date_from?: string
-          date_to?: string
-          min_pl?: number
-          max_pl?: number
-          outcome?: 'profit' | 'loss'
-          limit?: number
-        }
-
-        let trades = tradesData[block_id] || []
-
-        // Apply filters
-        if (date_from) {
-          const fromDate = new Date(date_from)
-          trades = trades.filter(t => new Date(t.dateOpened) >= fromDate)
-        }
-        if (date_to) {
-          const toDate = new Date(date_to)
-          trades = trades.filter(t => new Date(t.dateOpened) <= toDate)
-        }
-        if (min_pl !== undefined) {
-          trades = trades.filter(t => t.pl >= min_pl)
-        }
-        if (max_pl !== undefined) {
-          trades = trades.filter(t => t.pl <= max_pl)
-        }
-        if (outcome === 'profit') {
-          trades = trades.filter(t => t.pl > 0)
-        } else if (outcome === 'loss') {
-          trades = trades.filter(t => t.pl < 0)
-        }
-
-        const limitedTrades = trades.slice(0, Math.min(Number(limit), MAX_TRADES_LIMIT))
-
-        return JSON.stringify({
-          block_id,
-          filters: { date_from, date_to, min_pl, max_pl, outcome },
-          total_matches: trades.length,
-          returned_trades: limitedTrades.length,
-          trades: limitedTrades.map(formatTradeForAI),
-        }, null, 2)
-      }
-
-      case 'get_strategy_breakdown': {
-        const { block_id, samples_per_strategy = 5 } = toolInput as { block_id: string; samples_per_strategy?: number }
-        const allTrades = tradesData[block_id] || []
-
-        // Group trades by strategy
-        const strategiesMap = new Map<string, Trade[]>()
-        for (const trade of allTrades) {
-          const strategy = trade.strategy || 'Unknown'
-          if (!strategiesMap.has(strategy)) {
-            strategiesMap.set(strategy, [])
-          }
-          strategiesMap.get(strategy)!.push(trade)
-        }
-
-        // Build breakdown for each strategy
-        const breakdown = Array.from(strategiesMap.entries()).map(([strategyName, trades]) => {
-          const totalPl = trades.reduce((sum, t) => sum + t.pl, 0)
-          const wins = trades.filter(t => t.pl > 0)
-          const losses = trades.filter(t => t.pl < 0)
-
-          const avgWin = wins.length > 0 ? wins.reduce((sum, t) => sum + t.pl, 0) / wins.length : 0
-          const avgLoss = losses.length > 0 ? losses.reduce((sum, t) => sum + t.pl, 0) / losses.length : 0
-          const maxWin = wins.length > 0 ? Math.max(...wins.map(t => t.pl)) : 0
-          const maxLoss = losses.length > 0 ? Math.min(...losses.map(t => t.pl)) : 0
-
-          // Get sample trades (mix of wins and losses)
-          const sampleTrades = [
-            ...wins.slice(0, Math.ceil(Number(samples_per_strategy) / 2)),
-            ...losses.slice(0, Math.floor(Number(samples_per_strategy) / 2)),
-          ].slice(0, Math.min(Number(samples_per_strategy), 10))
-
-          return {
-            strategy_name: strategyName,
-            stats: {
-              total_trades: trades.length,
-              total_pl: totalPl,
-              win_rate: (wins.length / trades.length) * 100,
-              avg_win: avgWin,
-              avg_loss: avgLoss,
-              max_win: maxWin,
-              max_loss: maxLoss,
-              profit_factor: avgLoss !== 0 ? Math.abs(avgWin * wins.length / (avgLoss * losses.length)) : 0,
-            },
-            sample_trades: sampleTrades.map(formatTradeForAI),
-          }
-        })
-
-        return JSON.stringify({
-          block_id,
-          total_strategies: breakdown.length,
-          strategies: breakdown,
-        }, null, 2)
-      }
-
-      default:
-        return JSON.stringify({ error: `Unknown tool: ${toolName}` })
-    }
-  } catch (error) {
-    console.error(`Tool execution error (${toolName}):`, error)
-    return JSON.stringify({ error: error instanceof Error ? error.message : 'Unknown error' })
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const body = (await req.json()) as ChatRequest
-    const { messages, blockContexts, blockIds = [], tradesData = {}, apiKey, model, provider } = body
+    const { messages, blockContexts, blockIds = [], apiKey, model, provider } = body
 
     // Validate inputs
     if (!apiKey) {
@@ -222,6 +46,16 @@ export async function POST(req: Request) {
       )
     }
 
+    // Anthropic now uses direct browser API calls for better privacy and performance
+    if (provider === 'anthropic') {
+      return new Response(
+        JSON.stringify({
+          error: 'Anthropic requests are now handled client-side for privacy. This endpoint only supports OpenAI.'
+        }),
+        { status: 400, headers: { 'Content-Type': 'application/json' } }
+      )
+    }
+
     if (!blockContexts || blockContexts.length === 0) {
       return new Response(
         JSON.stringify({ error: 'At least one block context must be provided' }),
@@ -232,12 +66,7 @@ export async function POST(req: Request) {
     // Build system prompt with block contexts
     const systemPrompt = buildSystemPrompt(blockContexts, blockIds)
 
-    // For Anthropic with tool use, use native SDK for better control
-    if (provider === 'anthropic') {
-      return handleAnthropicWithTools(apiKey, model, systemPrompt, messages, tradesData)
-    }
-
-    // For OpenAI, use tool-enabled streaming
+    // Handle OpenAI requests
     return handleOpenAIWithTools(apiKey, model, systemPrompt, messages)
   } catch (error) {
     console.error('Chat API error:', error)
@@ -276,133 +105,6 @@ async function handleOpenAIWithTools(
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'OpenAI error',
-      }),
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    )
-  }
-}
-
-/**
- * Handle Anthropic requests with tool use support
- */
-async function handleAnthropicWithTools(
-  apiKey: string,
-  model: string,
-  systemPrompt: string,
-  messages: Array<{ role: string; content: string }>,
-  tradesData: Record<string, Trade[]>
-) {
-  const anthropic = new Anthropic({ apiKey })
-
-  // Convert messages to Anthropic format
-  const anthropicMessages = messages.map(msg => ({
-    role: msg.role as 'user' | 'assistant',
-    content: msg.content,
-  }))
-
-  try {
-    // Check if the user's message suggests they need trade-level data
-    const lastUserMessage = anthropicMessages[anthropicMessages.length - 1]?.content.toLowerCase() || ''
-    const needsTradeData =
-      lastUserMessage.includes('biggest') ||
-      lastUserMessage.includes('largest') ||
-      lastUserMessage.includes('top ') ||
-      lastUserMessage.includes('best ') ||
-      lastUserMessage.includes('worst ') ||
-      lastUserMessage.includes('specific') ||
-      lastUserMessage.includes('which trades') ||
-      lastUserMessage.includes('show me') ||
-      lastUserMessage.includes('what happened') ||
-      lastUserMessage.includes('find trades') ||
-      lastUserMessage.includes('win days') ||
-      lastUserMessage.includes('loss days')
-
-    // Create message with tools
-    const requestParams: Anthropic.Messages.MessageCreateParams = {
-      model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: anthropicMessages,
-      tools: ALL_TRADE_TOOLS,
-      // Force tool use for queries that clearly need trade-level data
-      ...(needsTradeData && { tool_choice: { type: 'any' as const } }),
-    }
-
-    const response = await anthropic.messages.create(requestParams)
-
-    // Handle tool use in a loop
-    let currentResponse = response
-    const conversationMessages: Anthropic.Messages.MessageParam[] = [...anthropicMessages]
-    const allTextBlocks: string[] = [] // Collect all text from all responses
-
-    while (currentResponse.stop_reason === 'tool_use') {
-      // Extract tool uses from response
-      const toolUses = currentResponse.content.filter(
-        (block): block is Anthropic.Messages.ToolUseBlock => block.type === 'tool_use'
-      )
-
-      if (toolUses.length === 0) break
-
-      // Collect any text blocks from this response
-      const textBlocks = currentResponse.content.filter(
-        (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
-      )
-      if (textBlocks.length > 0) {
-        allTextBlocks.push(...textBlocks.map(block => block.text))
-      }
-
-      // Add assistant's response to conversation
-      conversationMessages.push({
-        role: 'assistant',
-        content: currentResponse.content,
-      })
-
-      // Execute all tool calls
-      const toolResults = await Promise.all(
-        toolUses.map(async (toolUse) => {
-          const result = executeTool(toolUse.name, toolUse.input as Record<string, unknown>, tradesData)
-          return {
-            type: 'tool_result' as const,
-            tool_use_id: toolUse.id,
-            content: result,
-          }
-        })
-      )
-
-      // Add tool results to conversation
-      conversationMessages.push({
-        role: 'user',
-        content: toolResults,
-      })
-
-      // Continue conversation with tool results
-      currentResponse = await anthropic.messages.create({
-        model,
-        max_tokens: 4096,
-        system: systemPrompt,
-        messages: conversationMessages,
-        tools: ALL_TRADE_TOOLS,
-      })
-    }
-
-    // Extract final text response
-    const finalTextBlocks = currentResponse.content.filter(
-      (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
-    )
-    allTextBlocks.push(...finalTextBlocks.map(block => block.text))
-
-    // Combine all text blocks from all responses
-    const finalText = allTextBlocks.join('\n\n')
-
-    // Return as plain text response (not streaming for now)
-    return new Response(finalText, {
-      headers: { 'Content-Type': 'text/plain' },
-    })
-  } catch (error) {
-    console.error('Anthropic tool use error:', error)
-    return new Response(
-      JSON.stringify({
-        error: error instanceof Error ? error.message : 'Tool use error',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )

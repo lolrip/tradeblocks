@@ -28,8 +28,8 @@ import {
   type ConversationMessage,
 } from "@/lib/db/chat-store"
 import type { PortfolioStats } from "@/lib/models/portfolio-stats"
-import type { Trade } from "@/lib/models/trade"
 import { getApiKey, getModel, hasApiKey, getProvider, getModelLabel } from "@/lib/utils/llm-service"
+import { callAnthropicWithTools } from "@/lib/ai/anthropic-client"
 import {
   AlertCircle,
   Bot,
@@ -194,75 +194,101 @@ export function BlockAnalyst() {
         throw new Error("No valid blocks found")
       }
 
-      // Fetch trades data for tool use (for Anthropic models)
-      const tradesData: Record<string, Trade[]> = {}
       const provider = getProvider()
+      const apiKey = getApiKey(provider)
+      const model = getModel()
 
-      if (provider === 'anthropic') {
-        for (const blockId of selectedBlockIds) {
-          try {
-            const trades = await getTradesByBlock(blockId)
-            tradesData[blockId] = trades
-          } catch (error) {
-            console.error(`Failed to load trades for block ${blockId}:`, error)
-          }
-        }
+      if (!apiKey) {
+        throw new Error(`No API key found for ${provider}`)
       }
 
-      const response = await fetch("/api/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          messages: [...messages, userMessage]
-            .filter((msg) => msg.content && msg.content.trim() !== '')
-            .map((msg) => ({
-              role: msg.role,
-              content: msg.content,
-            })),
-          blockContexts,
-          blockIds: selectedBlockIds, // Pass block IDs for tool use
-          tradesData, // Pass pre-fetched trades data for tool use
-          apiKey: getApiKey(provider),
-          model: getModel(),
-          provider,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error(`API Error: ${response.statusText}`)
-      }
-
-      const reader = response.body?.getReader()
-      if (!reader) throw new Error("No response body")
-
-      const decoder = new TextDecoder()
       let assistantMessage = ""
-
       const assistantMessageId = (Date.now() + 1).toString()
       const assistantTimestamp = new Date()
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+      // Handle Anthropic with direct API call (client-side)
+      if (provider === 'anthropic') {
+        try {
+          // Call Anthropic API directly from the browser
+          assistantMessage = await callAnthropicWithTools(
+            apiKey,
+            model,
+            [...messages, userMessage]
+              .filter((msg) => msg.content && msg.content.trim() !== '')
+              .map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+              })),
+            blockContexts,
+            selectedBlockIds
+          )
 
-        const chunk = decoder.decode(value, { stream: true })
-        assistantMessage += chunk
-
-        // Update the assistant message in real-time
-        setMessages((prev) => {
-          const withoutLast = prev.filter((m) => m.id !== assistantMessageId)
-          return [
-            ...withoutLast,
+          // Update messages with the response
+          setMessages((prev) => [
+            ...prev,
             {
               id: assistantMessageId,
               role: "assistant" as const,
               content: assistantMessage,
               timestamp: assistantTimestamp,
             },
-          ]
+          ])
+        } catch (error) {
+          console.error('Anthropic API error:', error)
+          throw new Error(error instanceof Error ? error.message : 'Failed to get response from Anthropic')
+        }
+      } else {
+        // Handle OpenAI through server-side API route (streaming)
+        const response = await fetch("/api/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            messages: [...messages, userMessage]
+              .filter((msg) => msg.content && msg.content.trim() !== '')
+              .map((msg) => ({
+                role: msg.role,
+                content: msg.content,
+              })),
+            blockContexts,
+            blockIds: selectedBlockIds,
+            apiKey,
+            model,
+            provider,
+          }),
         })
+
+        if (!response.ok) {
+          throw new Error(`API Error: ${response.statusText}`)
+        }
+
+        const reader = response.body?.getReader()
+        if (!reader) throw new Error("No response body")
+
+        const decoder = new TextDecoder()
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          const chunk = decoder.decode(value, { stream: true })
+          assistantMessage += chunk
+
+          // Update the assistant message in real-time
+          setMessages((prev) => {
+            const withoutLast = prev.filter((m) => m.id !== assistantMessageId)
+            return [
+              ...withoutLast,
+              {
+                id: assistantMessageId,
+                role: "assistant" as const,
+                content: assistantMessage,
+                timestamp: assistantTimestamp,
+              },
+            ]
+          })
+        }
       }
 
       // Save conversation after successful exchange
