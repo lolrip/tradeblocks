@@ -120,8 +120,8 @@ export default function SettingsPage() {
               saveProvider(newProvider)
             }}>
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="openai">OpenAI</TabsTrigger>
                 <TabsTrigger value="anthropic">Anthropic</TabsTrigger>
+                <TabsTrigger value="openai">OpenAI</TabsTrigger>
               </TabsList>
             </Tabs>
           </div>
@@ -214,6 +214,14 @@ export default function SettingsPage() {
                 ? 'Choose the model that best fits your needs. GPT-5 Nano is recommended for most users.'
                 : 'Choose the model that best fits your needs. Claude Haiku 4.5 is recommended for most users.'}
             </p>
+            {provider === 'openai' && (
+              <Alert className="border-amber-500 bg-amber-50 dark:bg-amber-950/20">
+                <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription className="text-amber-900 dark:text-amber-100 text-xs">
+                  <strong>Note:</strong> OpenAI models work with aggregate portfolio statistics but do not support detailed trade-level data access. For queries about specific trades or dates, use Anthropic.
+                </AlertDescription>
+              </Alert>
+            )}
           </div>
 
           {/* Validation Error */}

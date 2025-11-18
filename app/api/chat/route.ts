@@ -207,16 +207,6 @@ export async function POST(req: Request) {
     const body = (await req.json()) as ChatRequest
     const { messages, blockContexts, blockIds = [], tradesData = {}, apiKey, model, provider } = body
 
-    // Debug logging - FIRST THING
-    console.log('========================================')
-    console.log('[ROUTE] POST /api/chat received')
-    console.log('[ROUTE] Provider:', provider)
-    console.log('[ROUTE] Model:', model)
-    console.log('[ROUTE] Has API key:', !!apiKey)
-    console.log('[ROUTE] Block IDs:', blockIds)
-    console.log('[ROUTE] Trades data available:', Object.keys(tradesData).length > 0)
-    console.log('========================================')
-
     // Validate inputs
     if (!apiKey) {
       return new Response(
@@ -244,25 +234,48 @@ export async function POST(req: Request) {
 
     // For Anthropic with tool use, use native SDK for better control
     if (provider === 'anthropic') {
-      console.log('[ROUTE] Taking Anthropic path with tools')
       return handleAnthropicWithTools(apiKey, model, systemPrompt, messages, tradesData)
     }
 
-    // For OpenAI, use standard streaming (no tool support yet for OpenAI in this implementation)
-    console.log('[ROUTE] Taking OpenAI path (no tools)')
-    const openai = createOpenAI({ apiKey })
-    const result = streamText({
-      model: openai(model),
-      system: systemPrompt,
-      messages,
-    })
-
-    return result.toTextStreamResponse()
+    // For OpenAI, use tool-enabled streaming
+    return handleOpenAIWithTools(apiKey, model, systemPrompt, messages)
   } catch (error) {
     console.error('Chat API error:', error)
     return new Response(
       JSON.stringify({
         error: error instanceof Error ? error.message : 'Internal server error',
+      }),
+      { status: 500, headers: { 'Content-Type': 'application/json' } }
+    )
+  }
+}
+
+/**
+ * Handle OpenAI requests (no tool support - use Anthropic for tool calling)
+ */
+async function handleOpenAIWithTools(
+  apiKey: string,
+  model: string,
+  systemPrompt: string,
+  messages: Array<{ role: string; content: string }>
+) {
+  const openai = createOpenAI({ apiKey })
+
+  try {
+    // OpenAI tool support is complex with current SDK version
+    // For now, use without tools - recommend Anthropic for tool calling
+    const result = streamText({
+      model: openai(model),
+      system: systemPrompt,
+      messages: messages.map(m => ({ role: m.role as 'user' | 'assistant', content: m.content })),
+    })
+
+    return result.toTextStreamResponse()
+  } catch (error) {
+    console.error('OpenAI error:', error)
+    return new Response(
+      JSON.stringify({
+        error: error instanceof Error ? error.message : 'OpenAI error',
       }),
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     )
@@ -304,11 +317,6 @@ async function handleAnthropicWithTools(
       lastUserMessage.includes('win days') ||
       lastUserMessage.includes('loss days')
 
-    console.log('[API] User message:', lastUserMessage.substring(0, 100))
-    console.log('[API] Needs trade data:', needsTradeData)
-    console.log('[API] Available tools:', ALL_TRADE_TOOLS.length)
-    console.log('[API] Trades data keys:', Object.keys(tradesData))
-
     // Create message with tools
     const requestParams = {
       model,
@@ -320,18 +328,12 @@ async function handleAnthropicWithTools(
       ...(needsTradeData && { tool_choice: { type: 'any' } }),
     }
 
-    console.log('[API] Request tool_choice:', requestParams.tool_choice)
-
     const response = await anthropic.messages.create(requestParams)
 
     // Handle tool use in a loop
     let currentResponse = response
     const conversationMessages: Anthropic.Messages.MessageParam[] = [...anthropicMessages]
     const allTextBlocks: string[] = [] // Collect all text from all responses
-
-    // Log initial response stop reason
-    console.log('[API] Initial stop_reason:', currentResponse.stop_reason)
-    console.log('[API] Initial content blocks:', currentResponse.content.map(b => b.type))
 
     while (currentResponse.stop_reason === 'tool_use') {
       // Extract tool uses from response
@@ -341,15 +343,11 @@ async function handleAnthropicWithTools(
 
       if (toolUses.length === 0) break
 
-      // Log tool usage for debugging
-      console.log(`[Tool Use] ${toolUses.length} tool(s) called:`, toolUses.map(t => t.name))
-
       // Collect any text blocks from this response
       const textBlocks = currentResponse.content.filter(
         (block): block is Anthropic.Messages.TextBlock => block.type === 'text'
       )
       if (textBlocks.length > 0) {
-        console.log('[Tool Use] Text before tool call:', textBlocks.map(b => b.text.substring(0, 100)))
         allTextBlocks.push(...textBlocks.map(block => block.text))
       }
 

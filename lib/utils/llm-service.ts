@@ -16,7 +16,7 @@ export type AnthropicModel = 'claude-sonnet-4-5' | 'claude-haiku-4-5'
 
 export type AIModel = OpenAIModel | AnthropicModel
 
-export const DEFAULT_PROVIDER: AIProvider = 'openai'
+export const DEFAULT_PROVIDER: AIProvider = 'anthropic'
 export const DEFAULT_OPENAI_MODEL: OpenAIModel = 'gpt-5-nano'
 export const DEFAULT_ANTHROPIC_MODEL: AnthropicModel = 'claude-haiku-4-5'
 
