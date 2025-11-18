@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useEffect } from "react"
-import { ProcessedBlock } from "@/lib/models/block"
+import { Block } from "@/lib/stores/block-store"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -30,7 +30,7 @@ import { IconLayoutGrid } from "@tabler/icons-react"
 import { getStrategiesByBlock } from "@/lib/db/trades-store"
 
 interface BlockSelectionGridProps {
-  blocks: ProcessedBlock[]
+  blocks: Block[]
   selectedBlockIds: string[]
   onSelectedBlocksChange: (blockIds: string[]) => void
   disabled?: boolean
@@ -102,7 +102,7 @@ export function BlockSelectionGrid({
     return `${value.toFixed(2)}%`
   }
 
-  const getDateRange = (block: ProcessedBlock) => {
+  const getDateRange = (block: Block) => {
     // For now, use created date as placeholder
     // In a full implementation, this would come from trade data
     const created = new Date(block.created).toLocaleDateString('en-US', {
@@ -214,7 +214,7 @@ export function BlockSelectionGrid({
               <TableBody>
                 {blocks.map(block => {
                   const isSelected = selectedBlockIds.includes(block.id)
-                  const stats = block.portfolioStats
+                  const stats = block.stats
 
                   return (
                     <TableRow
@@ -247,36 +247,32 @@ export function BlockSelectionGrid({
                         </div>
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {stats?.totalPl !== undefined ? (
+                        {stats.totalPnL !== undefined ? (
                           <span
                             className={
-                              stats.totalPl >= 0
+                              stats.totalPnL >= 0
                                 ? 'text-green-600 dark:text-green-500'
                                 : 'text-red-600 dark:text-red-500'
                             }
                           >
-                            {formatCurrency(stats.totalPl)}
+                            {formatCurrency(stats.totalPnL)}
                           </span>
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {stats?.sharpeRatio !== undefined ? (
-                          stats.sharpeRatio.toFixed(2)
+                        <span className="text-muted-foreground">-</span>
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {stats.winRate !== undefined ? (
+                          formatPercent(stats.winRate)
                         ) : (
                           <span className="text-muted-foreground">-</span>
                         )}
                       </TableCell>
                       <TableCell className="text-right font-mono">
-                        {stats?.winRate !== undefined ? (
-                          formatPercent(stats.winRate * 100)
-                        ) : (
-                          <span className="text-muted-foreground">-</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right font-mono">
-                        {stats?.totalTrades !== undefined ? (
+                        {stats.totalTrades !== undefined ? (
                           stats.totalTrades.toLocaleString()
                         ) : (
                           <span className="text-muted-foreground">-</span>

@@ -190,7 +190,7 @@ export function optimizeBlockStrategies(
   // Handle single-strategy blocks - lock at 100%
   if (strategyReturns.length === 1) {
     const singleStrategy = strategyReturns[0]
-    const strategyName = singleStrategy.strategyName
+    const strategyName = singleStrategy.strategy
 
     // Calculate metrics for the single strategy
     const aligned = alignStrategyReturns(strategyReturns)

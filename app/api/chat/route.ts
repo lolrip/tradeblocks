@@ -318,14 +318,14 @@ async function handleAnthropicWithTools(
       lastUserMessage.includes('loss days')
 
     // Create message with tools
-    const requestParams = {
+    const requestParams: Anthropic.Messages.MessageCreateParams = {
       model,
       max_tokens: 4096,
       system: systemPrompt,
       messages: anthropicMessages,
       tools: ALL_TRADE_TOOLS,
       // Force tool use for queries that clearly need trade-level data
-      ...(needsTradeData && { tool_choice: { type: 'any' } }),
+      ...(needsTradeData && { tool_choice: { type: 'any' as const } }),
     }
 
     const response = await anthropic.messages.create(requestParams)

@@ -599,9 +599,8 @@ export default function MonteCarloPage() {
                   },
                 ]}
                 layout={{
-                  title: '',
-                  xaxis: { title: 'Trade Number' },
-                  yaxis: { title: 'Portfolio Value ($)' },
+                  xaxis: { title: { text: 'Trade Number' } },
+                  yaxis: { title: { text: 'Portfolio Value ($)' } },
                   height: 400,
                   showlegend: true,
                   legend: { orientation: 'h', y: -0.2 },
@@ -629,13 +628,12 @@ export default function MonteCarloPage() {
                       color: '#6366f1',
                       line: { color: '#4f46e5', width: 1 },
                     },
-                    nbinsx: 50,
-                  },
+                    xbins: { size: (Math.max(...mcResult.simulations.map(s => s.finalValue)) - Math.min(...mcResult.simulations.map(s => s.finalValue))) / 50 },
+                  } as Partial<Plotly.PlotData>,
                 ]}
                 layout={{
-                  title: '',
-                  xaxis: { title: 'Final Portfolio Value ($)' },
-                  yaxis: { title: 'Frequency' },
+                  xaxis: { title: { text: 'Final Portfolio Value ($)' } },
+                  yaxis: { title: { text: 'Frequency' } },
                   height: 400,
                   shapes: [
                     {

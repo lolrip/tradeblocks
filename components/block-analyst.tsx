@@ -28,6 +28,7 @@ import {
   type ConversationMessage,
 } from "@/lib/db/chat-store"
 import type { PortfolioStats } from "@/lib/models/portfolio-stats"
+import type { Trade } from "@/lib/models/trade"
 import { getApiKey, getModel, hasApiKey, getProvider, getModelLabel } from "@/lib/utils/llm-service"
 import {
   AlertCircle,

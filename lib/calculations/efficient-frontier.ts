@@ -90,7 +90,7 @@ export interface PortfolioResult {
  * Detects and handles data corruption (Date objects, timestamps, invalid numbers)
  */
 function getNumericFundsAtClose(trade: Trade, context: string): number {
-  const funds = trade.fundsAtClose
+  const funds = trade.fundsAtClose as unknown
 
   // Handle Date objects (should never happen but IndexedDB can cause this)
   if (funds instanceof Date) {
