@@ -13,6 +13,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { IconHistory, IconTrash, IconClock } from "@tabler/icons-react"
 import { useOptimizationHistory } from "@/lib/hooks/use-optimization-history"
 import type { OptimizationHistoryEntry } from "@/lib/types/portfolio-optimizer-types"
@@ -25,6 +35,7 @@ interface HistorySelectorProps {
 export function HistorySelector({ onLoadHistory, disabled = false }: HistorySelectorProps) {
   const { history, deleteHistoryEntry, isLoading } = useOptimizationHistory()
   const [selectedHistoryId, setSelectedHistoryId] = React.useState<string>("")
+  const [historyToDelete, setHistoryToDelete] = React.useState<OptimizationHistoryEntry | null>(null)
 
   const handleLoadHistory = (historyId: string) => {
     const entry = history.find(h => h.id === historyId)
@@ -34,10 +45,13 @@ export function HistorySelector({ onLoadHistory, disabled = false }: HistorySele
     }
   }
 
-  const handleDeleteHistory = (historyId: string) => {
-    deleteHistoryEntry(historyId)
-    if (selectedHistoryId === historyId) {
-      setSelectedHistoryId("")
+  const handleConfirmDelete = () => {
+    if (historyToDelete) {
+      deleteHistoryEntry(historyToDelete.id)
+      if (selectedHistoryId === historyToDelete.id) {
+        setSelectedHistoryId("")
+      }
+      setHistoryToDelete(null)
     }
   }
 
@@ -97,13 +111,18 @@ export function HistorySelector({ onLoadHistory, disabled = false }: HistorySele
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground flex-shrink-0"
+                    className="h-7 w-7 p-0 hover:bg-destructive hover:text-destructive-foreground flex-shrink-0"
                     onClick={(e) => {
+                      e.preventDefault()
                       e.stopPropagation()
-                      handleDeleteHistory(entry.id)
+                      setHistoryToDelete(entry)
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
                     }}
                   >
-                    <IconTrash size={14} />
+                    <IconTrash size={16} />
                   </Button>
                 </div>
               </SelectItem>
@@ -111,6 +130,26 @@ export function HistorySelector({ onLoadHistory, disabled = false }: HistorySele
           </SelectContent>
         </Select>
       </div>
+
+      <AlertDialog open={!!historyToDelete} onOpenChange={(open) => !open && setHistoryToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete History Entry</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete this optimization result? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

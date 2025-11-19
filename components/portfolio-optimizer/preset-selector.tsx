@@ -22,6 +22,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog"
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
@@ -54,6 +64,7 @@ export function PresetSelector({
   const [newPresetName, setNewPresetName] = useState("")
   const [newPresetDescription, setNewPresetDescription] = useState("")
   const [selectedPresetId, setSelectedPresetId] = useState<string>("")
+  const [presetToDelete, setPresetToDelete] = useState<OptimizationPreset | null>(null)
 
   const handleSavePreset = () => {
     if (!newPresetName.trim()) return
@@ -81,10 +92,13 @@ export function PresetSelector({
     }
   }
 
-  const handleDeletePreset = (presetId: string) => {
-    deletePreset(presetId)
-    if (selectedPresetId === presetId) {
-      setSelectedPresetId("")
+  const handleConfirmDelete = () => {
+    if (presetToDelete) {
+      deletePreset(presetToDelete.id)
+      if (selectedPresetId === presetToDelete.id) {
+        setSelectedPresetId("")
+      }
+      setPresetToDelete(null)
     }
   }
 
@@ -115,13 +129,18 @@ export function PresetSelector({
                   <Button
                     variant="ghost"
                     size="sm"
-                    className="h-6 w-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                    className="h-7 w-7 p-0 hover:bg-destructive hover:text-destructive-foreground"
                     onClick={(e) => {
+                      e.preventDefault()
                       e.stopPropagation()
-                      handleDeletePreset(preset.id)
+                      setPresetToDelete(preset)
+                    }}
+                    onMouseDown={(e) => {
+                      e.preventDefault()
+                      e.stopPropagation()
                     }}
                   >
-                    <IconTrash size={14} />
+                    <IconTrash size={16} />
                   </Button>
                 </div>
               </SelectItem>
@@ -184,6 +203,26 @@ export function PresetSelector({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={!!presetToDelete} onOpenChange={(open) => !open && setPresetToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Preset</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete the preset &quot;{presetToDelete?.name}&quot;? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }

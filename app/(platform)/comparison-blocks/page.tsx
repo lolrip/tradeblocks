@@ -1054,7 +1054,7 @@ export default function ComparisonBlocksPage() {
                   metrics={selectedAlignment.metrics}
                   alignment={selectedAlignment}
                   normalizeTo1Lot={normalizeTo1Lot}
-                  initialCapital={activeBlock?.portfolioStats?.initialCapital ?? 0}
+                  initialCapital={0}
                 />
               </CardContent>
             </Card>

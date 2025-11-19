@@ -24,7 +24,6 @@ import {
   alignStrategyReturns,
   simulateWeightedPortfolioEquity,
   calculatePortfolioMetrics,
-  type StrategyReturns,
   type EquityCurvePoint,
 } from "@/lib/calculations/efficient-frontier"
 import { ChartWrapper, createLineChartLayout } from "@/components/performance-charts/chart-wrapper"
@@ -128,13 +127,6 @@ export function ComparisonTab({ result, totalCapital }: ComparisonTabProps) {
         setOptimizedEquity(optimizedCurve)
 
         // Calculate metrics for equal-weight
-        const equalWeightReturns = aligned.returns.map((stratReturns, i) =>
-          stratReturns.map((r) => r * equalWeights[i])
-        )
-        const equalWeightPortfolioReturns = aligned.dates.map((_, dateIdx) =>
-          equalWeightReturns.reduce((sum, stratReturns) => sum + stratReturns[dateIdx], 0)
-        )
-
         const ewMetrics = calculatePortfolioMetrics(equalWeights, aligned.returns, 2.0)
         const ewMaxDD = Math.min(...equalWeightCurve.map(p => p.drawdownPct))
         const ewFinalValue = equalWeightCurve[equalWeightCurve.length - 1]?.equity || totalCapital
@@ -150,13 +142,6 @@ export function ComparisonTab({ result, totalCapital }: ComparisonTabProps) {
         })
 
         // Calculate metrics for optimized
-        const optimizedReturns = aligned.returns.map((stratReturns, i) =>
-          stratReturns.map((r) => r * optimizedWeights[i])
-        )
-        const optimizedPortfolioReturns = aligned.dates.map((_, dateIdx) =>
-          optimizedReturns.reduce((sum, stratReturns) => sum + stratReturns[dateIdx], 0)
-        )
-
         const optMetrics = calculatePortfolioMetrics(optimizedWeights, aligned.returns, 2.0)
         const optMaxDD = Math.min(...optimizedCurve.map(p => p.drawdownPct))
         const optFinalValue = optimizedCurve[optimizedCurve.length - 1]?.equity || totalCapital

@@ -79,7 +79,7 @@ export function KellyTabImpl({ result, totalCapital }: KellyTabProps) {
     }
 
     calculateKelly()
-  }, [result])
+  }, [result, totalCapital])
 
   if (!result) {
     return (
