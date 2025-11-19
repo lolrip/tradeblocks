@@ -128,3 +128,96 @@ IndexedDB stores (via `lib/db/`) handle persistence of:
 - Trade records (can be thousands per block)
 - Daily log entries
 - Cached calculations
+
+## Portfolio Optimizer (Central Hub)
+
+### Overview
+The Portfolio Optimizer has been redesigned as the central feature of the application, consolidating multiple optimization and analytics features into a single, comprehensive workspace. It replaces the previous standalone tabs for Block Optimizer, Efficient Frontier, Monte Carlo Simulator, Correlation Matrix, Position Sizing, and Comparison Blocks.
+
+### Key Features
+
+**1. Hierarchical Optimization**
+- **Level 1**: Optimizes strategy weights within each selected block independently
+- **Level 2**: Optimizes block allocation across the portfolio using Level 1 results
+- Provides granular control over both intra-block and inter-block allocation
+- Handles single-strategy blocks (automatically locked at 100%)
+
+**2. Preset Management**
+- Save and load optimization configurations (block selection, settings, capital)
+- Stored in localStorage via `lib/hooks/use-optimization-presets.ts`
+- Quick access to frequently-used configurations
+- Maximum 50 presets stored
+
+**3. Results History**
+- All optimization runs are automatically saved to history
+- Retrieve previous results when navigating away
+- Stored in localStorage via `lib/hooks/use-optimization-history.ts`
+- Maximum 50 historical entries stored
+- Includes full results, timestamps, and metadata
+
+**4. Integrated Analytics Tabs**
+The Portfolio Optimizer includes six integrated tabs:
+- **Results**: Hierarchical allocation table with CSV/clipboard export
+- **Efficient Frontier**: Visualization of risk/return frontier (placeholder)
+- **Monte Carlo**: Forward projections using optimized weights (placeholder)
+- **Correlation**: Correlation heatmap of selected strategies (placeholder)
+- **Kelly**: Kelly-optimal leverage recommendations (placeholder)
+- **Comparison**: Before/after performance comparison (placeholder)
+
+Note: Tabs marked as placeholder are UI-ready but need implementation of the actual analytics.
+
+### File Structure
+
+**Core Page**:
+- `app/(platform)/portfolio-optimizer/page.tsx` - Main portfolio optimizer page
+
+**Components**:
+- `components/portfolio-optimizer/preset-selector.tsx` - Preset save/load UI
+- `components/portfolio-optimizer/history-selector.tsx` - History load UI
+- `components/portfolio-optimizer/two-level-controls.tsx` - Optimization settings
+- `components/portfolio-optimizer/hierarchical-results.tsx` - Results display
+- `components/portfolio-optimizer/tabs/*.tsx` - Integrated analytics tabs
+
+**Hooks**:
+- `lib/hooks/use-optimization-presets.ts` - Preset management
+- `lib/hooks/use-optimization-history.ts` - History management
+
+**Types**:
+- `lib/types/portfolio-optimizer-types.ts` - OptimizationMode, OptimizationPreset, OptimizationHistoryEntry
+
+**Utilities**:
+- `lib/utils/optimization-export.ts` - CSV/JSON export functions
+
+**Calculations** (existing):
+- `lib/calculations/hierarchical-optimizer.ts` - Two-level optimization engine
+- `lib/workers/hierarchical-optimization.worker.ts` - Web Worker for async processing
+
+### Navigation Structure
+
+The application now features a simplified navigation sidebar with 5 main items:
+1. **Block Management** - Upload and manage trading data
+2. **Block Stats** - Quick overview of a single block
+3. **Portfolio Optimizer** - Central optimization hub (main feature)
+4. **Performance Analysis** - Detailed charting (15+ charts in 5 tabs)
+5. **Settings** - Application configuration
+
+Legacy routes (block-optimizer, efficient-frontier, monte-carlo, etc.) remain accessible via direct links but are no longer in the main navigation.
+
+### Data Model
+
+The Portfolio Optimizer uses a **flat block structure** rather than nested hierarchies:
+- Blocks are independent containers of trades
+- Each trade has a strategy label (string)
+- Hierarchy is simulated mathematically during optimization (not in data structure)
+- This keeps the data model simple while providing powerful multi-level optimization
+
+### Future Enhancements
+
+Planned improvements to the integrated tabs:
+1. **Efficient Frontier Tab**: Add Plotly chart showing risk/return curve
+2. **Monte Carlo Tab**: Implement bootstrap resampling for forward projections
+3. **Correlation Tab**: Integrate correlation matrix calculation and heatmap
+4. **Kelly Tab**: Calculate and display Kelly-optimal leverage multipliers
+5. **Comparison Tab**: Show equal-weight baseline vs optimized allocation comparison
+
+Additional modes for single-block and multi-block (non-hierarchical) optimization may be added in the future.

@@ -12,10 +12,11 @@ interface ReconciliationMetricsProps {
   metrics: AlignmentMetrics
   alignment: AlignedTradeSet // Need full alignment to calculate session-based match rate
   normalizeTo1Lot?: boolean
+  initialCapital?: number // Starting capital for equity curves
   className?: string
 }
 
-export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = false, className }: ReconciliationMetricsProps) {
+export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = false, initialCapital = 0, className }: ReconciliationMetricsProps) {
   const {
     backtested,
     delta,
@@ -87,14 +88,14 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
   )
 
   const equityCurveData = sortedPairs.length > 0
-    ? calculateDualEquityCurves(sortedPairs, 0, normalizeTo1Lot)
+    ? calculateDualEquityCurves(sortedPairs, initialCapital, normalizeTo1Lot)
     : null
 
   // Calculate separate equity curves for all trades (matched + unmatched)
   const allTradesData = calculateSeparateEquityCurves(
     alignment.backtestedTrades,
     alignment.reportedTrades,
-    0,
+    initialCapital,
     normalizeTo1Lot
   )
 
@@ -272,7 +273,13 @@ export function ReconciliationMetrics({ metrics, alignment, normalizeTo1Lot = fa
 
       <SlippageDistributionChart data={slippageDistribution} normalizeTo1Lot={normalizeTo1Lot} />
 
-      <DualEquityCurveChart matchedData={equityCurveData} allTradesData={allTradesData} normalizeTo1Lot={normalizeTo1Lot} />
+      <DualEquityCurveChart
+        matchedData={equityCurveData}
+        allTradesData={allTradesData}
+        normalizeTo1Lot={normalizeTo1Lot}
+        initialCapital={initialCapital}
+        strategyName={alignment.backtestedStrategy}
+      />
 
       {/* Statistical Significance Card */}
       {tTest && (

@@ -3,7 +3,6 @@
 import { AlertTriangle, Github, ShieldQuestion } from "lucide-react";
 import Link from "next/link";
 
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -44,62 +43,57 @@ const disclaimerSections = [
 
 export function SidebarFooterLegal() {
   return (
-    <div className="space-y-4 border-t border-sidebar-border/80 px-3 pb-6 pt-4 text-[0.72rem] leading-relaxed text-muted-foreground">
-      <Alert className="gap-2">
-        <AlertTriangle className="h-4 w-4 text-amber-500" aria-hidden />
-        <div className="space-y-1">
-          <AlertTitle className="text-xs uppercase tracking-wide text-muted-foreground">
-            Important Notice
-          </AlertTitle>
-          <AlertDescription className="text-[0.72rem] text-foreground">
-            TradeBlocks builds insights, not investment advice.
-          </AlertDescription>
-          <Dialog>
-            <DialogTrigger asChild>
-              <Button
-                variant="link"
-                size="sm"
-                className="h-auto p-0 text-[0.72rem] font-medium text-primary"
-              >
-                Full Disclaimer
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[80vh] overflow-y-auto border-none bg-gradient-to-b from-background to-muted/40 p-0 sm:max-w-2xl">
-              <DialogTitle className="sr-only">Full Disclaimer</DialogTitle>
-              <div className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-2xl sm:p-8">
-                <DialogHeader className="gap-2 text-left">
-                  <div className="flex items-center gap-2 text-base font-semibold text-foreground">
-                    <AlertTriangle
-                      className="h-5 w-5 text-amber-500"
-                      aria-hidden
-                    />
-                    Important Disclaimer
-                  </div>
-                  <DialogDescription className="flex items-center gap-2 text-sm text-muted-foreground">
-                    Please read before building your analytics
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-5 text-sm leading-relaxed text-foreground">
-                  {disclaimerSections.map((section) => (
-                    <section key={section.title} className="space-y-1.5">
-                      <h3
-                        className={`text-base font-semibold ${section.accent}`}
-                      >
-                        {section.title}
-                      </h3>
-                      <p>{section.body}</p>
-                    </section>
-                  ))}
+    <div className="space-y-2 border-t border-sidebar-border/80 px-3 pb-4 pt-3 text-[0.7rem] leading-relaxed text-muted-foreground">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="inline-flex items-center gap-1 text-muted-foreground">
+          <AlertTriangle className="h-3 w-3 text-amber-500" aria-hidden />
+          TradeBlocks builds insights, not investment advice.
+        </span>
+        <Dialog>
+          <DialogTrigger asChild>
+            <Button
+              variant="link"
+              size="sm"
+              className="h-auto p-0 text-[0.7rem] font-medium text-primary"
+            >
+              Full Disclaimer
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-h-[80vh] overflow-y-auto border-none bg-gradient-to-b from-background to-muted/40 p-0 sm:max-w-2xl">
+            <DialogTitle className="sr-only">Full Disclaimer</DialogTitle>
+            <div className="flex flex-col gap-4 rounded-3xl border border-border/60 bg-card p-6 shadow-2xl sm:p-8">
+              <DialogHeader className="gap-2 text-left">
+                <div className="flex items-center gap-2 text-base font-semibold text-foreground">
+                  <AlertTriangle
+                    className="h-5 w-5 text-amber-500"
+                    aria-hidden
+                  />
+                  Important Disclaimer
                 </div>
-                <div className="flex items-center justify-center gap-2 rounded-2xl bg-muted px-4 py-3 text-sm font-semibold italic text-muted-foreground">
-                  <ShieldQuestion className="h-4 w-4" aria-hidden />
-                  Remember: TradeBlocks builds insights, not investment advice.
-                </div>
+                <DialogDescription className="flex items-center gap-2 text-sm text-muted-foreground">
+                  Please read before building your analytics
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-5 text-sm leading-relaxed text-foreground">
+                {disclaimerSections.map((section) => (
+                  <section key={section.title} className="space-y-1.5">
+                    <h3
+                      className={`text-base font-semibold ${section.accent}`}
+                    >
+                      {section.title}
+                    </h3>
+                    <p>{section.body}</p>
+                  </section>
+                ))}
               </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </Alert>
+              <div className="flex items-center justify-center gap-2 rounded-2xl bg-muted px-4 py-3 text-sm font-semibold italic text-muted-foreground">
+                <ShieldQuestion className="h-4 w-4" aria-hidden />
+                Remember: TradeBlocks builds insights, not investment advice.
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
       <div className="flex flex-wrap items-center gap-2 text-[0.7rem] text-muted-foreground">
         <Link
           href="https://speakinggreeks.com"

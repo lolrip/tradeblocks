@@ -841,3 +841,94 @@ function groupBySession(trades: NormalizedTrade[]): Map<string, NormalizedTrade[
 
   return map
 }
+
+/**
+ * Aggregates multiple strategy alignments into a single portfolio-level alignment
+ *
+ * This function combines all backtested trades, reported trades, and matched pairs
+ * from multiple individual strategy alignments to create a unified portfolio view.
+ * Useful for viewing overall portfolio reconciliation metrics instead of individual strategies.
+ *
+ * @param alignments - Array of individual strategy alignments to aggregate
+ * @param normalizeTo1Lot - Whether to normalize calculations to per-contract basis
+ * @returns A synthetic AlignedTradeSet representing the entire portfolio
+ */
+export function aggregateAlignments(
+  alignments: AlignedTradeSet[],
+  normalizeTo1Lot: boolean
+): AlignedTradeSet {
+  if (alignments.length === 0) {
+    throw new Error('Cannot aggregate empty alignments array')
+  }
+
+  // Combine all trades from all alignments
+  const allBacktestedTrades = alignments.flatMap(a => a.backtestedTrades)
+  const allReportedTrades = alignments.flatMap(a => a.reportedTrades)
+
+  // Extract all matched pairs from all alignments
+  const allMatchedPairs: MatchedPair[] = alignments.flatMap(alignment =>
+    alignment.sessions.flatMap(session =>
+      session.items
+        .filter(item =>
+          item.isPaired &&
+          item.backtested &&
+          item.reported &&
+          item.includedBacktested &&
+          item.includedReported
+        )
+        .map(item => ({
+          backtested: item.backtested!,
+          reported: item.reported!,
+        }))
+    )
+  )
+
+  // Recalculate metrics for combined data
+  const combinedMetrics = buildMetrics(
+    allBacktestedTrades,
+    allReportedTrades,
+    allMatchedPairs,
+    normalizeTo1Lot
+  )
+
+  // Combine sessions from all alignments
+  const allSessions = alignments.flatMap(a => a.sessions)
+
+  // Merge sessions with the same date
+  const sessionMap = new Map<string, TradeSessionMatch>()
+  allSessions.forEach(session => {
+    const existing = sessionMap.get(session.session)
+    if (existing) {
+      existing.items.push(...session.items)
+    } else {
+      sessionMap.set(session.session, {
+        session: session.session,
+        items: [...session.items],
+      })
+    }
+  })
+
+  const mergedSessions = Array.from(sessionMap.values()).sort((a, b) =>
+    a.session.localeCompare(b.session)
+  )
+
+  // Combine selected trade IDs from all alignments
+  const allAutoSelectedBacktested = [...new Set(alignments.flatMap(a => a.autoSelectedBacktestedIds))]
+  const allAutoSelectedReported = [...new Set(alignments.flatMap(a => a.autoSelectedReportedIds))]
+  const allSelectedBacktested = [...new Set(alignments.flatMap(a => a.selectedBacktestedIds))]
+  const allSelectedReported = [...new Set(alignments.flatMap(a => a.selectedReportedIds))]
+
+  return {
+    alignmentId: '__PORTFOLIO_VIEW__',
+    backtestedStrategy: 'All Strategies',
+    reportedStrategy: 'All Strategies',
+    backtestedTrades: allBacktestedTrades,
+    reportedTrades: allReportedTrades,
+    metrics: combinedMetrics,
+    sessions: mergedSessions,
+    autoSelectedBacktestedIds: allAutoSelectedBacktested,
+    autoSelectedReportedIds: allAutoSelectedReported,
+    selectedBacktestedIds: allSelectedBacktested,
+    selectedReportedIds: allSelectedReported,
+  }
+}

@@ -37,6 +37,7 @@ import {
   updateBlock as updateProcessedBlock,
 } from "@/lib/db";
 import { StrategyAlignment } from "@/lib/models/strategy-alignment";
+import { aggregateAlignments } from "@/lib/services/trade-reconciliation";
 import { useBlockStore } from "@/lib/stores/block-store";
 import { useComparisonStore } from "@/lib/stores/comparison-store";
 import { cn } from "@/lib/utils";
@@ -50,6 +51,7 @@ interface SelectableStrategy {
 }
 
 const NORMALIZE_STORAGE_KEY_PREFIX = "comparison:normalizeTo1Lot:";
+const PORTFOLIO_VIEW_ID = "__ALL_STRATEGIES__";
 
 function buildStrategySummary(
   strategies: string[],
@@ -116,6 +118,23 @@ export default function ComparisonBlocksPage() {
   );
   const [dialogNote, setDialogNote] = useState("");
   const [normalizeTo1Lot, setNormalizeTo1Lot] = useState(false);
+
+  // Compute selected alignment (individual strategy or aggregated portfolio view)
+  const selectedAlignment = useMemo(() => {
+    if (!comparisonData || comparisonData.alignments.length === 0) {
+      return null;
+    }
+
+    // Check if portfolio view is selected
+    if (selectedAlignmentId === PORTFOLIO_VIEW_ID) {
+      return aggregateAlignments(comparisonData.alignments, normalizeTo1Lot);
+    }
+
+    // Return individual alignment (or first one if none selected)
+    return selectedAlignmentId
+      ? comparisonData.alignments.find(a => a.alignmentId === selectedAlignmentId)
+      : comparisonData.alignments[0];
+  }, [comparisonData, selectedAlignmentId, normalizeTo1Lot]);
 
   useEffect(() => {
     if (!activeBlockId || typeof window === "undefined") {
@@ -250,9 +269,13 @@ export default function ComparisonBlocksPage() {
       return;
     }
 
-    const stillValid = comparisonData.alignments.some(
-      (alignment) => alignment.alignmentId === selectedAlignmentId
-    );
+    // Check if selected alignment is still valid
+    // Portfolio view ID is always valid when there are multiple alignments
+    const stillValid =
+      selectedAlignmentId === PORTFOLIO_VIEW_ID ||
+      comparisonData.alignments.some(
+        (alignment) => alignment.alignmentId === selectedAlignmentId
+      );
 
     if (!stillValid) {
       setSelectedAlignmentId(comparisonData.alignments[0].alignmentId);
@@ -954,12 +977,7 @@ export default function ComparisonBlocksPage() {
       )}
 
       {/* Statistical Analysis Section - Show detailed metrics for selected alignment */}
-      {comparisonData && comparisonData.alignments.length > 0 && comparisonLastBlockId === activeBlockId && (() => {
-        const selectedAlignment = selectedAlignmentId
-          ? comparisonData.alignments.find(a => a.alignmentId === selectedAlignmentId)
-          : comparisonData.alignments[0];
-
-        if (!selectedAlignment) return null;
+      {selectedAlignment && comparisonData && comparisonData.alignments.length > 0 && comparisonLastBlockId === activeBlockId && (() => {
 
         return (
           <div className="space-y-6">
@@ -1001,6 +1019,14 @@ export default function ComparisonBlocksPage() {
                       <SelectValue placeholder="Select alignment" />
                     </SelectTrigger>
                     <SelectContent>
+                      {comparisonData.alignments.length > 1 && (
+                        <>
+                          <SelectItem key={PORTFOLIO_VIEW_ID} value={PORTFOLIO_VIEW_ID}>
+                            All Strategies (Portfolio View)
+                          </SelectItem>
+                          <Separator className="my-1" />
+                        </>
+                      )}
                       {comparisonData.alignments.map((alignment) => (
                         <SelectItem key={alignment.alignmentId} value={alignment.alignmentId}>
                           {alignment.backtestedStrategy}
@@ -1028,6 +1054,7 @@ export default function ComparisonBlocksPage() {
                   metrics={selectedAlignment.metrics}
                   alignment={selectedAlignment}
                   normalizeTo1Lot={normalizeTo1Lot}
+                  initialCapital={activeBlock?.portfolioStats?.initialCapital ?? 0}
                 />
               </CardContent>
             </Card>

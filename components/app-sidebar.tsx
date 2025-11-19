@@ -1,18 +1,12 @@
 "use client";
 
 import {
-  IconChartArea,
-  IconChartDots,
-  IconChartDots3,
-  IconChartHistogram,
-  IconGauge,
   IconLayoutDashboard,
-  IconLink,
   IconReportAnalytics,
-  IconRouteSquare,
+  IconScale,
   IconSettings,
   IconStack2,
-  IconTarget,
+  IconTarget
 } from "@tabler/icons-react";
 import { Blocks } from "lucide-react";
 import Link from "next/link";
@@ -46,54 +40,21 @@ const navData = {
       icon: IconLayoutDashboard,
     },
     {
-      title: "Performance Blocks",
-      href: "/performance-blocks",
-      icon: IconReportAnalytics,
-    },
-
-    {
-      title: "Position Sizing",
-      href: "/position-sizing",
-      icon: IconGauge,
-    },
-    {
-      title: "Risk Simulator",
-      href: "/risk-simulator",
-      icon: IconRouteSquare,
-    },
-    {
-      title: "Correlation Matrix",
-      href: "/correlation-matrix",
-      icon: IconChartHistogram,
-    },
-    {
-      title: "Efficient Frontier",
-      href: "/efficient-frontier",
-      icon: IconChartDots,
-      badge: "Beta",
-    },
-    {
-      title: "Monte Carlo Simulator",
-      href: "/monte-carlo",
-      icon: IconChartArea,
-    },
-    {
-      title: "Block Optimizer",
-      href: "/block-optimizer",
-      icon: IconChartDots3,
-      badge: "Beta",
+      title: "Comparison Blocks",
+      href: "/comparison-blocks",
+      icon: IconScale,
+      description: "Backtest vs actual trade execution analysis",
     },
     {
       title: "Portfolio Optimizer",
       href: "/portfolio-optimizer",
       icon: IconTarget,
-      badge: "Beta",
+      description: "Comprehensive optimization with integrated analytics",
     },
     {
-      title: "Comparison Blocks",
-      href: "/comparison-blocks",
-      icon: IconLink,
-      badge: "Beta",
+      title: "Performance Analysis",
+      href: "/performance-blocks",
+      icon: IconReportAnalytics,
     },
     {
       title: "Settings",
@@ -134,7 +95,7 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
                 </div>
                 <span className="flex flex-col">
                   <span className="text-sm font-semibold leading-tight">
-                    TradeBlocks+
+                    TradeBlocks++
                   </span>
                   <span className="text-xs text-muted-foreground">
                     Analytics Platform

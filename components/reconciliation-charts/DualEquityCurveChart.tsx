@@ -11,6 +11,8 @@ interface DualEquityCurveChartProps {
   matchedData: EquityCurvePoint[] | null
   allTradesData: { backtested: SeparateEquityCurvePoint[]; reported: SeparateEquityCurvePoint[] } | null
   normalizeTo1Lot?: boolean
+  initialCapital?: number
+  strategyName?: string // Optional strategy name to display when viewing filtered data
   className?: string
 }
 
@@ -18,6 +20,8 @@ export function DualEquityCurveChart({
   matchedData,
   allTradesData,
   normalizeTo1Lot = false,
+  initialCapital = 0,
+  strategyName,
   className
 }: DualEquityCurveChartProps) {
   const [yAxisScale, setYAxisScale] = useState<"linear" | "log">("linear")
@@ -153,15 +157,18 @@ export function DualEquityCurveChart({
   // Use at least 10% of max absolute value as padding to avoid zero range
   const padding = equityRange > 0 ? equityRange * 0.1 : Math.max(Math.abs(maxEquity) * 0.1, 100)
 
+  // Determine y-axis label based on whether we're showing absolute equity or relative P/L
+  const yAxisLabel = initialCapital > 0 ? "Account Value ($)" : "Cumulative P/L ($)"
+
   const layout: Partial<Layout> = {
-    ...createLineChartLayout("", "Date", "Cumulative P/L ($)"),
+    ...createLineChartLayout("", "Date", yAxisLabel),
     xaxis: {
       title: { text: "Date" },
       showgrid: true,
     },
     yaxis: {
       title: {
-        text: "Cumulative P/L ($)",
+        text: yAxisLabel,
         standoff: 50,
       },
       showgrid: true,
@@ -184,6 +191,11 @@ export function DualEquityCurveChart({
 
   const controls = (
     <div className="flex items-center gap-3">
+      {strategyName && (
+        <Badge variant="outline" className="text-xs font-medium">
+          Strategy: {strategyName}
+        </Badge>
+      )}
       {normalizeTo1Lot && (
         <Badge variant="secondary" className="text-xs">
           Per Contract
@@ -224,11 +236,12 @@ export function DualEquityCurveChart({
 
   // Build description
   const normalizationNote = normalizeTo1Lot ? " (per contract)" : ""
+  const capitalNote = initialCapital > 0 ? ` Starting capital: $${initialCapital.toLocaleString()}.` : ""
   let description = ""
   if (tradeMode === "matched" && finalInfo.matchedCount) {
-    description = `Comparing ${finalInfo.matchedCount} matched trades${normalizationNote}. Final difference: $${finalInfo.finalDifference!.toFixed(2)} (${finalInfo.finalPercentDiff! > 0 ? "+" : ""}${finalInfo.finalPercentDiff!.toFixed(2)}%)`
+    description = `Comparing ${finalInfo.matchedCount} matched trades${normalizationNote}.${capitalNote} Final difference: $${finalInfo.finalDifference!.toFixed(2)} (${finalInfo.finalPercentDiff! > 0 ? "+" : ""}${finalInfo.finalPercentDiff!.toFixed(2)}%)`
   } else if (tradeMode === "all") {
-    description = `Showing all trades${normalizationNote}: ${finalInfo.backtestedCount} backtested, ${finalInfo.reportedCount} reported`
+    description = `Showing all trades${normalizationNote}: ${finalInfo.backtestedCount} backtested, ${finalInfo.reportedCount} reported.${capitalNote}`
   }
 
   return (
