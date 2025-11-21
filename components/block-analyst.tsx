@@ -28,7 +28,7 @@ import {
   type ConversationMessage,
 } from "@/lib/db/chat-store"
 import type { PortfolioStats } from "@/lib/models/portfolio-stats"
-import { getApiKey, getModel, hasApiKey, getProvider, getModelLabel } from "@/lib/utils/llm-service"
+import { getApiKey, getModel, hasApiKey, getProvider, getModelLabel, getAnthropicApiModelId, type AnthropicModel } from "@/lib/utils/llm-service"
 import { callAnthropicWithTools } from "@/lib/ai/anthropic-client"
 import {
   AlertCircle,
@@ -209,10 +209,13 @@ export function BlockAnalyst() {
       // Handle Anthropic with direct API call (client-side)
       if (provider === 'anthropic') {
         try {
+          // Map friendly model name to actual Anthropic API model ID
+          const apiModelId = getAnthropicApiModelId(model as AnthropicModel)
+
           // Call Anthropic API directly from the browser
           assistantMessage = await callAnthropicWithTools(
             apiKey,
-            model,
+            apiModelId,
             [...messages, userMessage]
               .filter((msg) => msg.content && msg.content.trim() !== '')
               .map((msg) => ({

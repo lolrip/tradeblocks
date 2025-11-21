@@ -60,10 +60,10 @@ export function HierarchicalResults({
   // Determine which metrics and allocation to display
   const hasFilteredResults = result.filteredResult !== undefined
   const displayMetrics = showFiltered && hasFilteredResults
-    ? result.filteredResult.portfolioMetrics
+    ? result.filteredResult!.portfolioMetrics
     : result.portfolioMetrics
   const displayAllocation = showFiltered && hasFilteredResults
-    ? result.filteredResult.combinedAllocation
+    ? result.filteredResult!.combinedAllocation
     : result.combinedAllocation
 
   // Calculate block weights from displayAllocation
@@ -112,7 +112,7 @@ export function HierarchicalResults({
                 </div>
                 <p className="text-sm text-muted-foreground">
                   {showFiltered
-                    ? `Showing ${result.filteredResult.filteredStrategies.length} untradeable strategies filtered out`
+                    ? `Showing ${result.filteredResult!.filteredStrategies.length} untradeable strategies filtered out`
                     : 'Showing all strategies (including those below minimum position size)'}
                 </p>
               </div>
@@ -183,25 +183,25 @@ export function HierarchicalResults({
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Annualized Return</span>
                     <span className="font-mono font-semibold text-green-600 dark:text-green-500">
-                      {result.filteredResult.portfolioMetrics.annualizedReturn.toFixed(2)}%
+                      {result.filteredResult!.portfolioMetrics.annualizedReturn.toFixed(2)}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Annualized Volatility</span>
                     <span className="font-mono font-semibold">
-                      {result.filteredResult.portfolioMetrics.annualizedVolatility.toFixed(2)}%
+                      {result.filteredResult!.portfolioMetrics.annualizedVolatility.toFixed(2)}%
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Sharpe Ratio</span>
                     <span className="font-mono font-semibold text-blue-600 dark:text-blue-500">
-                      {result.filteredResult.portfolioMetrics.sharpeRatio.toFixed(3)}
+                      {result.filteredResult!.portfolioMetrics.sharpeRatio.toFixed(3)}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Tradeable Strategies</span>
                     <span className="font-mono font-semibold">
-                      {Object.values(result.filteredResult.combinedAllocation).reduce((sum, strategies) =>
+                      {Object.values(result.filteredResult!.combinedAllocation).reduce((sum, strategies) =>
                         sum + Object.keys(strategies).length, 0
                       )}
                     </span>
@@ -209,7 +209,7 @@ export function HierarchicalResults({
                   <div className="flex justify-between">
                     <span className="text-sm text-muted-foreground">Filtered Out</span>
                     <span className="font-mono font-semibold text-amber-600">
-                      {result.filteredResult.filteredStrategies.length} ({(result.filteredResult.totalFilteredWeight * 100).toFixed(1)}% weight)
+                      {result.filteredResult!.filteredStrategies.length} ({(result.filteredResult!.totalFilteredWeight * 100).toFixed(1)}% weight)
                     </span>
                   </div>
                 </div>
@@ -220,15 +220,15 @@ export function HierarchicalResults({
       )}
 
       {/* Filtered Strategies Warning */}
-      {hasFilteredResults && showFiltered && result.filteredResult.filteredStrategies.length > 0 && (
+      {hasFilteredResults && showFiltered && result.filteredResult!.filteredStrategies.length > 0 && (
         <Alert>
           <IconAlertTriangle className="h-4 w-4" />
           <AlertDescription>
             <p className="font-semibold mb-2">
-              {result.filteredResult.filteredStrategies.length} strategies filtered out due to minimum margin requirements
+              {result.filteredResult!.filteredStrategies.length} strategies filtered out due to minimum margin requirements
             </p>
             <div className="space-y-2 text-sm">
-              {result.filteredResult.filteredStrategies.map((filtered, idx) => (
+              {result.filteredResult!.filteredStrategies.map((filtered, idx) => (
                 <div key={idx} className="flex justify-between items-center">
                   <span>
                     <strong>{filtered.blockName}</strong> / {filtered.strategyName}

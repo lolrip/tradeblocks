@@ -60,6 +60,20 @@ export const ANTHROPIC_MODELS: Array<{
 ]
 
 /**
+ * Map friendly model names to actual Anthropic API model IDs
+ */
+export function getAnthropicApiModelId(model: AnthropicModel): string {
+  switch (model) {
+    case 'claude-haiku-4-5':
+      return 'claude-haiku-4-5-20251001'
+    case 'claude-sonnet-4-5':
+      return 'claude-sonnet-4-5-20251001'
+    default:
+      return model
+  }
+}
+
+/**
  * Save provider selection to localStorage
  */
 export function saveProvider(provider: AIProvider): void {
