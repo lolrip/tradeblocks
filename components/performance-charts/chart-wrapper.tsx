@@ -86,9 +86,19 @@ export function ChartWrapper({
     .toLowerCase()
     .replace(/\s+/g, "-")}-${Math.random().toString(36).substring(2, 11)}`;
 
+  // Track component lifecycle and pending timeouts to prevent resize after unmount
+  const isMountedRef = useRef(true);
+  const resizeTimeoutsRef = useRef<Set<ReturnType<typeof setTimeout>>>(new Set());
+
   // Handle manual resize when container changes
   useEffect(() => {
+    // Capture ref values for cleanup
+    const timeoutsSet = resizeTimeoutsRef.current;
+
     const handleResize = () => {
+      // Only resize if component is still mounted
+      if (!isMountedRef.current) return;
+
       try {
         // Use global Plotly if available (react-plotly.js makes it available)
         if (typeof window !== "undefined" && window.Plotly) {
@@ -101,8 +111,12 @@ export function ChartWrapper({
 
     // Set up ResizeObserver to detect container size changes
     const resizeObserver = new ResizeObserver(() => {
-      // Debounce resize calls
-      setTimeout(handleResize, 50);
+      // Debounce resize calls and track the timeout
+      const timeoutId = setTimeout(() => {
+        timeoutsSet.delete(timeoutId);
+        handleResize();
+      }, 50);
+      timeoutsSet.add(timeoutId);
     });
 
     if (plotRef.current) {
@@ -111,12 +125,18 @@ export function ChartWrapper({
 
     return () => {
       resizeObserver.disconnect();
+      // Clear all pending resize timeouts
+      timeoutsSet.forEach(clearTimeout);
+      timeoutsSet.clear();
     };
   }, [chartId]);
 
   // Also resize when theme changes (can affect layout)
   useEffect(() => {
     const handleResize = () => {
+      // Only resize if component is still mounted
+      if (!isMountedRef.current) return;
+
       try {
         if (typeof window !== "undefined" && window.Plotly) {
           window.Plotly.Plots.resize(chartId);
@@ -130,6 +150,13 @@ export function ChartWrapper({
     const timeoutId = setTimeout(handleResize, 150);
     return () => clearTimeout(timeoutId);
   }, [theme, chartId]);
+
+  // Set mounted flag to false on unmount
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
 
   // Enhanced layout with theme support
   const themedLayout = React.useMemo(() => {
