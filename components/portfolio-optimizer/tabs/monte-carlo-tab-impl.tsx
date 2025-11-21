@@ -125,11 +125,14 @@ export function MonteCarloTabImpl({ result, totalCapital }: MonteCarloTabProps) 
     const { percentiles } = mcResult
     const dates = Array.from({ length: simLength + 1 }, (_, i) => `Month ${i}`)
 
+    // Convert percentile returns (decimals) to dollar values
+    const convertToDollars = (returns: number[]) => returns.map(r => totalCapital * (1 + r))
+
     return [
       // P5-P95 band
       {
         x: dates,
-        y: percentiles.p95,
+        y: convertToDollars(percentiles.p95),
         type: 'scatter' as const,
         mode: 'lines' as const,
         name: 'P95',
@@ -138,7 +141,7 @@ export function MonteCarloTabImpl({ result, totalCapital }: MonteCarloTabProps) 
       },
       {
         x: dates,
-        y: percentiles.p5,
+        y: convertToDollars(percentiles.p5),
         type: 'scatter' as const,
         mode: 'lines' as const,
         name: '5th-95th Percentile',
@@ -149,7 +152,7 @@ export function MonteCarloTabImpl({ result, totalCapital }: MonteCarloTabProps) 
       // P25-P75 band
       {
         x: dates,
-        y: percentiles.p75,
+        y: convertToDollars(percentiles.p75),
         type: 'scatter' as const,
         mode: 'lines' as const,
         name: 'P75',
@@ -158,7 +161,7 @@ export function MonteCarloTabImpl({ result, totalCapital }: MonteCarloTabProps) 
       },
       {
         x: dates,
-        y: percentiles.p25,
+        y: convertToDollars(percentiles.p25),
         type: 'scatter' as const,
         mode: 'lines' as const,
         name: '25th-75th Percentile',
@@ -169,14 +172,14 @@ export function MonteCarloTabImpl({ result, totalCapital }: MonteCarloTabProps) 
       // Median line
       {
         x: dates,
-        y: percentiles.p50,
+        y: convertToDollars(percentiles.p50),
         type: 'scatter' as const,
         mode: 'lines' as const,
         name: 'Median (P50)',
         line: { color: '#ef4444', width: 3 },
       },
     ]
-  }, [mcResult, simLength])
+  }, [mcResult, simLength, totalCapital])
 
   // Memoize histogram data
   const histogramData = useMemo(() => {
@@ -308,13 +311,13 @@ export function MonteCarloTabImpl({ result, totalCapital }: MonteCarloTabProps) 
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">5th Percentile (Worst)</p>
                   <p className="text-2xl font-bold text-red-600 dark:text-red-500">
-                    ${mcResult.statistics.valueAtRisk.p5.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    ${(totalCapital * (1 + mcResult.statistics.valueAtRisk.p5)).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-sm text-muted-foreground">95th Percentile (Best)</p>
                   <p className="text-2xl font-bold text-green-600 dark:text-green-500">
-                    ${mcResult.percentiles.p95[mcResult.percentiles.p95.length - 1].toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    ${(totalCapital * (1 + mcResult.percentiles.p95[mcResult.percentiles.p95.length - 1])).toLocaleString(undefined, { maximumFractionDigits: 0 })}
                   </p>
                 </div>
                 <div className="space-y-2">
