@@ -111,6 +111,17 @@ export interface OptimizedBlock {
 }
 
 /**
+ * Information about a filtered strategy
+ */
+export interface FilteredStrategy {
+  blockName: string
+  strategyName: string
+  allocatedCapital: number
+  requiredMargin: number
+  weight: number
+}
+
+/**
  * Complete hierarchical optimization result
  */
 export interface HierarchicalResult {
@@ -130,6 +141,21 @@ export interface HierarchicalResult {
   blockEfficientFrontier: PortfolioResult[]
   /** Combined allocation: strategy weights in overall portfolio */
   combinedAllocation: Record<string, Record<string, number>> // blockName -> { strategyName -> weight }
+  /** Margin-filtered result (optional) */
+  filteredResult?: {
+    /** Filtered portfolio metrics (after removing untradeable strategies) */
+    portfolioMetrics: {
+      annualizedReturn: number
+      annualizedVolatility: number
+      sharpeRatio: number
+    }
+    /** Adjusted combined allocation after filtering */
+    combinedAllocation: Record<string, Record<string, number>>
+    /** List of strategies that were filtered out */
+    filteredStrategies: FilteredStrategy[]
+    /** Total weight that was filtered out */
+    totalFilteredWeight: number
+  }
 }
 
 /**
@@ -428,4 +454,206 @@ export function getFlatAllocation(combinedAllocation: Record<string, Record<stri
   }
 
   return flatAllocation
+}
+
+/**
+ * Calculate average margin requirement per strategy from trades
+ * Returns a map of strategy name -> average margin requirement
+ */
+export function calculateStrategyMarginRequirements(trades: Trade[]): Record<string, number> {
+  const marginSums: Record<string, number> = {}
+  const marginCounts: Record<string, number> = {}
+
+  for (const trade of trades) {
+    const strategy = trade.strategy || 'Unknown'
+    const margin = trade.marginReq || 0
+
+    if (margin > 0) {
+      if (!marginSums[strategy]) {
+        marginSums[strategy] = 0
+        marginCounts[strategy] = 0
+      }
+      marginSums[strategy] += margin
+      marginCounts[strategy] += 1
+    }
+  }
+
+  const averageMargins: Record<string, number> = {}
+  for (const strategy in marginSums) {
+    averageMargins[strategy] = marginSums[strategy] / marginCounts[strategy]
+  }
+
+  return averageMargins
+}
+
+/**
+ * Apply minimum margin filter to optimization results
+ * Filters out strategies where allocated capital < average margin requirement
+ * Redistributes filtered weight proportionally to remaining strategies
+ */
+export function applyMinimumMarginFilter(
+  result: HierarchicalResult,
+  totalCapital: number,
+  optimizedBlocks: OptimizedBlock[]
+): HierarchicalResult['filteredResult'] {
+  // Calculate margin requirements for all strategies
+  const allTrades: Trade[] = []
+  for (const block of optimizedBlocks) {
+    allTrades.push(...block.trades)
+  }
+  const marginRequirements = calculateStrategyMarginRequirements(allTrades)
+
+  // Identify strategies to filter
+  const filteredStrategies: FilteredStrategy[] = []
+  const keptStrategies: Array<{
+    blockName: string
+    strategyName: string
+    weight: number
+  }> = []
+
+  let totalFilteredWeight = 0
+
+  for (const [blockName, strategies] of Object.entries(result.combinedAllocation)) {
+    for (const [strategyName, weight] of Object.entries(strategies)) {
+      const allocatedCapital = weight * totalCapital
+      const requiredMargin = marginRequirements[strategyName] || 0
+
+      // Filter if allocation is below margin requirement (and margin data exists)
+      if (requiredMargin > 0 && allocatedCapital < requiredMargin) {
+        filteredStrategies.push({
+          blockName,
+          strategyName,
+          allocatedCapital,
+          requiredMargin,
+          weight,
+        })
+        totalFilteredWeight += weight
+      } else {
+        keptStrategies.push({ blockName, strategyName, weight })
+      }
+    }
+  }
+
+  // If nothing was filtered, return null
+  if (filteredStrategies.length === 0) {
+    return undefined
+  }
+
+  // Redistribute filtered weight proportionally among kept strategies
+  const redistributionFactor = 1 / (1 - totalFilteredWeight)
+  const adjustedAllocation: Record<string, Record<string, number>> = {}
+
+  for (const { blockName, strategyName, weight } of keptStrategies) {
+    if (!adjustedAllocation[blockName]) {
+      adjustedAllocation[blockName] = {}
+    }
+    adjustedAllocation[blockName][strategyName] = weight * redistributionFactor
+  }
+
+  // Recalculate portfolio metrics with adjusted weights
+  const adjustedMetrics = recalculatePortfolioMetrics(
+    adjustedAllocation,
+    optimizedBlocks
+  )
+
+  return {
+    portfolioMetrics: adjustedMetrics,
+    combinedAllocation: adjustedAllocation,
+    filteredStrategies,
+    totalFilteredWeight,
+  }
+}
+
+/**
+ * Recalculate portfolio metrics after adjusting weights
+ */
+function recalculatePortfolioMetrics(
+  combinedAllocation: Record<string, Record<string, number>>,
+  optimizedBlocks: OptimizedBlock[]
+): {
+  annualizedReturn: number
+  annualizedVolatility: number
+  sharpeRatio: number
+} {
+  // Build a map of block returns
+  const blockReturnsMap: Record<string, { dates: string[]; returns: number[] }> = {}
+  for (const block of optimizedBlocks) {
+    blockReturnsMap[block.blockName] = {
+      dates: block.dates,
+      returns: block.returns,
+    }
+  }
+
+  // Calculate portfolio daily returns with adjusted weights
+  // First, get all unique dates
+  const allDatesSet = new Set<string>()
+  for (const block of optimizedBlocks) {
+    block.dates.forEach(date => allDatesSet.add(date))
+  }
+  const allDates = Array.from(allDatesSet).sort()
+
+  // Build date index maps for each block
+  const blockDateIndices: Record<string, Record<string, number>> = {}
+  for (const block of optimizedBlocks) {
+    const dateIndex: Record<string, number> = {}
+    block.dates.forEach((date, idx) => {
+      dateIndex[date] = idx
+    })
+    blockDateIndices[block.blockName] = dateIndex
+  }
+
+  // Calculate portfolio returns for each date
+  const portfolioReturns: number[] = []
+  for (const date of allDates) {
+    let dailyReturn = 0
+    for (const [blockName, strategies] of Object.entries(combinedAllocation)) {
+      const blockData = blockReturnsMap[blockName]
+      const dateIdx = blockDateIndices[blockName][date]
+
+      if (dateIdx !== undefined && blockData) {
+        const blockReturn = blockData.returns[dateIdx]
+        // Weight this block's return by the sum of all strategy weights in it
+        const totalBlockWeight = Object.values(strategies).reduce((sum, w) => sum + w, 0)
+        dailyReturn += blockReturn * totalBlockWeight
+      }
+    }
+    portfolioReturns.push(dailyReturn)
+  }
+
+  // Calculate annualized metrics
+  const numDays = portfolioReturns.length
+  if (numDays === 0) {
+    return {
+      annualizedReturn: 0,
+      annualizedVolatility: 0,
+      sharpeRatio: 0,
+    }
+  }
+
+  // Mean daily return
+  const meanDailyReturn = portfolioReturns.reduce((sum, r) => sum + r, 0) / numDays
+
+  // Annualized return (assuming 252 trading days)
+  const annualizedReturn = meanDailyReturn * 252 * 100
+
+  // Daily volatility (sample std dev)
+  const variance = portfolioReturns.reduce((sum, r) => {
+    const diff = r - meanDailyReturn
+    return sum + diff * diff
+  }, 0) / (numDays - 1)
+  const dailyVolatility = Math.sqrt(variance)
+
+  // Annualized volatility
+  const annualizedVolatility = dailyVolatility * Math.sqrt(252) * 100
+
+  // Sharpe ratio (assuming 0% risk-free rate for simplicity)
+  const sharpeRatio = annualizedVolatility > 0
+    ? annualizedReturn / annualizedVolatility
+    : 0
+
+  return {
+    annualizedReturn,
+    annualizedVolatility,
+    sharpeRatio,
+  }
 }

@@ -278,7 +278,11 @@ export default function ComparisonBlocksPage() {
       );
 
     if (!stillValid) {
-      setSelectedAlignmentId(comparisonData.alignments[0].alignmentId);
+      setSelectedAlignmentId(
+        comparisonData.alignments.length > 1
+          ? PORTFOLIO_VIEW_ID
+          : comparisonData.alignments[0].alignmentId
+      );
     }
   }, [comparisonData, selectedAlignmentId]);
 

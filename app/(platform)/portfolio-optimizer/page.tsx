@@ -13,6 +13,7 @@ import {
   DEFAULT_HIERARCHICAL_CONFIG,
   type HierarchicalConfig,
   type HierarchicalResult,
+  applyMinimumMarginFilter,
 } from "@/lib/calculations/hierarchical-optimizer"
 import type {
   HierarchicalOptimizationRequest,
@@ -127,7 +128,20 @@ export default function PortfolioOptimizerPage() {
 
   // Handle optimization completion
   const handleCompletion = useCallback((message: HierarchicalCompletionMessage) => {
-    setResult(message.result)
+    // Apply margin filtering to the result
+    const filteredResult = applyMinimumMarginFilter(
+      message.result,
+      totalCapital,
+      message.result.optimizedBlocks
+    )
+
+    // Add filtered result to the main result
+    const resultWithFilter: HierarchicalResult = {
+      ...message.result,
+      filteredResult,
+    }
+
+    setResult(resultWithFilter)
     setOptimizationDuration(message.duration)
     setState('complete')
     setProgress(100)
@@ -145,7 +159,7 @@ export default function PortfolioOptimizerPage() {
       selectedBlockNames,
       config,
       totalCapital,
-      result: message.result,
+      result: resultWithFilter,
       duration: message.duration,
     })
 

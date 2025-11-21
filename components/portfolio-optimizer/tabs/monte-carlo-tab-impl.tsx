@@ -91,13 +91,18 @@ export function MonteCarloTabImpl({ result, totalCapital }: MonteCarloTabProps) 
         // Combine all weighted trades
         const allTrades = blockTrades.flatMap(b => b.trades)
 
+        // Convert months to number of trades
+        const tradesPerYear = 250 // Assume ~250 trading days per year
+        const tradesPerMonth = tradesPerYear / 12 // ~20.83 trades per month
+        const simulationLengthInTrades = Math.round(simLength * tradesPerMonth)
+
         // Run Monte Carlo simulation
         const simulationResult = runMonteCarloSimulation(allTrades, {
           numSimulations: numSims,
-          simulationLength: simLength,
+          simulationLength: simulationLengthInTrades, // Number of trades to simulate
           initialCapital: totalCapital,
           resampleMethod: 'trades', // Resample individual trades
-          tradesPerYear: 250, // Assume ~250 trading days per year
+          tradesPerYear: tradesPerYear,
           randomSeed: 42,
         })
 

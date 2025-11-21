@@ -147,6 +147,27 @@ export function KellyTabImpl({ result, totalCapital }: KellyTabProps) {
         </AlertDescription>
       </Alert>
 
+      {/* Kelly vs Optimization Weights Explanation */}
+      <Alert>
+        <AlertDescription>
+          <p className="font-semibold mb-2">Why do Kelly percentages differ from optimization weights?</p>
+          <ul className="list-disc list-inside space-y-1 text-sm">
+            <li>
+              <strong>Kelly optimizes each strategy in isolation</strong> - It maximizes geometric growth for that strategy alone, without considering correlations.
+            </li>
+            <li>
+              <strong>Portfolio optimization uses Sharpe ratios</strong> - It considers how strategies interact and diversify the overall portfolio.
+            </li>
+            <li>
+              <strong>Diversification can trump Kelly</strong> - A strategy with lower Kelly % but low/negative correlation with other strategies may receive higher allocation for better risk-adjusted returns.
+            </li>
+          </ul>
+          <p className="text-xs text-muted-foreground mt-2">
+            Kelly percentages are informational and do not directly influence the optimization. Portfolio optimization prioritizes diversification and risk-adjusted returns.
+          </p>
+        </AlertDescription>
+      </Alert>
+
       {/* Portfolio Summary */}
       <Card>
         <CardHeader>

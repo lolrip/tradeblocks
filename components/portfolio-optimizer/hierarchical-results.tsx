@@ -18,13 +18,16 @@ import {
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { IconChevronDown, IconChevronRight } from "@tabler/icons-react"
+import { IconChevronDown, IconChevronRight, IconAlertTriangle } from "@tabler/icons-react"
 import type { HierarchicalResult } from "@/lib/calculations/hierarchical-optimizer"
 
 interface HierarchicalResultsProps {
@@ -37,6 +40,7 @@ export function HierarchicalResults({
   totalCapital,
 }: HierarchicalResultsProps) {
   const [expandedBlocks, setExpandedBlocks] = useState<Set<string>>(new Set())
+  const [showFiltered, setShowFiltered] = useState(true)
 
   const toggleBlock = (blockName: string) => {
     setExpandedBlocks(prev => {
@@ -53,34 +57,228 @@ export function HierarchicalResults({
   const formatPercent = (value: number) => `${(value * 100).toFixed(2)}%`
   const formatCurrency = (value: number) => `$${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
 
+  // Determine which metrics and allocation to display
+  const hasFilteredResults = result.filteredResult !== undefined
+  const displayMetrics = showFiltered && hasFilteredResults
+    ? result.filteredResult.portfolioMetrics
+    : result.portfolioMetrics
+  const displayAllocation = showFiltered && hasFilteredResults
+    ? result.filteredResult.combinedAllocation
+    : result.combinedAllocation
+
+  // Calculate block weights from displayAllocation
+  const displayBlockWeights: Record<string, number> = {}
+  for (const [blockName, strategies] of Object.entries(displayAllocation)) {
+    displayBlockWeights[blockName] = Object.values(strategies).reduce((sum, w) => sum + w, 0)
+  }
+
+  // Calculate strategy weights within blocks from displayAllocation
+  const displayStrategyWeights: Record<string, Record<string, number>> = {}
+  for (const [blockName, strategies] of Object.entries(displayAllocation)) {
+    displayStrategyWeights[blockName] = {}
+    const blockWeight = displayBlockWeights[blockName]
+    if (blockWeight > 0) {
+      for (const [strategyName, weight] of Object.entries(strategies)) {
+        displayStrategyWeights[blockName][strategyName] = weight / blockWeight
+      }
+    }
+  }
+
   return (
     <div className="space-y-6">
+      {/* Filter Toggle - Only show if filtering is available */}
+      {hasFilteredResults && (
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Label htmlFor="filter-toggle" className="text-base font-semibold">
+                    Show tradeable allocations only
+                  </Label>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <IconAlertTriangle size={16} className="text-amber-600" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p className="max-w-xs">
+                          Filters out strategies where allocated capital is below the minimum margin requirement.
+                          Filtered weight is redistributed proportionally to remaining strategies.
+                        </p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  {showFiltered
+                    ? `Showing ${result.filteredResult.filteredStrategies.length} untradeable strategies filtered out`
+                    : 'Showing all strategies (including those below minimum position size)'}
+                </p>
+              </div>
+              <Switch
+                id="filter-toggle"
+                checked={showFiltered}
+                onCheckedChange={setShowFiltered}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Comparison Metrics - Show when filtering is active */}
+      {hasFilteredResults && showFiltered && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Theoretical vs Practical Returns</CardTitle>
+            <CardDescription>
+              Comparison of optimization with all strategies vs tradeable strategies only
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Theoretical */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Theoretical (All Strategies)</h3>
+                  <Badge variant="outline">Includes Untradeable</Badge>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Annualized Return</span>
+                    <span className="font-mono font-semibold text-green-600 dark:text-green-500">
+                      {result.portfolioMetrics.annualizedReturn.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Annualized Volatility</span>
+                    <span className="font-mono font-semibold">
+                      {result.portfolioMetrics.annualizedVolatility.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Sharpe Ratio</span>
+                    <span className="font-mono font-semibold text-blue-600 dark:text-blue-500">
+                      {result.portfolioMetrics.sharpeRatio.toFixed(3)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Total Strategies</span>
+                    <span className="font-mono font-semibold">
+                      {Object.values(result.combinedAllocation).reduce((sum, strategies) =>
+                        sum + Object.keys(strategies).length, 0
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Practical */}
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold">Practical (Tradeable Only)</h3>
+                  <Badge>Realistic</Badge>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Annualized Return</span>
+                    <span className="font-mono font-semibold text-green-600 dark:text-green-500">
+                      {result.filteredResult.portfolioMetrics.annualizedReturn.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Annualized Volatility</span>
+                    <span className="font-mono font-semibold">
+                      {result.filteredResult.portfolioMetrics.annualizedVolatility.toFixed(2)}%
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Sharpe Ratio</span>
+                    <span className="font-mono font-semibold text-blue-600 dark:text-blue-500">
+                      {result.filteredResult.portfolioMetrics.sharpeRatio.toFixed(3)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Tradeable Strategies</span>
+                    <span className="font-mono font-semibold">
+                      {Object.values(result.filteredResult.combinedAllocation).reduce((sum, strategies) =>
+                        sum + Object.keys(strategies).length, 0
+                      )}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-muted-foreground">Filtered Out</span>
+                    <span className="font-mono font-semibold text-amber-600">
+                      {result.filteredResult.filteredStrategies.length} ({(result.filteredResult.totalFilteredWeight * 100).toFixed(1)}% weight)
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Filtered Strategies Warning */}
+      {hasFilteredResults && showFiltered && result.filteredResult.filteredStrategies.length > 0 && (
+        <Alert>
+          <IconAlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            <p className="font-semibold mb-2">
+              {result.filteredResult.filteredStrategies.length} strategies filtered out due to minimum margin requirements
+            </p>
+            <div className="space-y-2 text-sm">
+              {result.filteredResult.filteredStrategies.map((filtered, idx) => (
+                <div key={idx} className="flex justify-between items-center">
+                  <span>
+                    <strong>{filtered.blockName}</strong> / {filtered.strategyName}
+                  </span>
+                  <span className="text-muted-foreground">
+                    Allocated: {formatCurrency(filtered.allocatedCapital)} •
+                    Required: {formatCurrency(filtered.requiredMargin)}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {/* Portfolio Metrics Summary */}
       <Card>
         <CardHeader>
-          <CardTitle>Portfolio Performance (Optimized)</CardTitle>
-          <CardDescription>
-            Performance metrics of the hierarchically optimized portfolio
-          </CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Portfolio Performance (Optimized)</CardTitle>
+              <CardDescription>
+                Performance metrics of the hierarchically optimized portfolio
+              </CardDescription>
+            </div>
+            {hasFilteredResults && (
+              <Badge variant={showFiltered ? "default" : "outline"}>
+                {showFiltered ? "Tradeable Only" : "All Strategies"}
+              </Badge>
+            )}
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Annualized Return</p>
               <p className="text-3xl font-bold text-green-600 dark:text-green-500">
-                {result.portfolioMetrics.annualizedReturn.toFixed(2)}%
+                {displayMetrics.annualizedReturn.toFixed(2)}%
               </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Annualized Volatility</p>
               <p className="text-3xl font-bold">
-                {result.portfolioMetrics.annualizedVolatility.toFixed(2)}%
+                {displayMetrics.annualizedVolatility.toFixed(2)}%
               </p>
             </div>
             <div className="space-y-2">
               <p className="text-sm text-muted-foreground">Sharpe Ratio</p>
               <p className="text-3xl font-bold text-blue-600 dark:text-blue-500">
-                {result.portfolioMetrics.sharpeRatio.toFixed(3)}
+                {displayMetrics.sharpeRatio.toFixed(3)}
               </p>
             </div>
           </div>
@@ -103,7 +301,21 @@ export function HierarchicalResults({
                   <TableHead className="w-12"></TableHead>
                   <TableHead>Block / Strategy</TableHead>
                   <TableHead className="text-right">Weight</TableHead>
-                  <TableHead className="text-right">Capital Allocation</TableHead>
+                  <TableHead className="text-right">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help underline decoration-dotted">Capital Allocation</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">
+                            This represents <strong>portfolio weight in dollars</strong>, not deployable capital or margin requirements.
+                            For example, $92 means this strategy contributes 0.092% to your portfolio&apos;s returns, not that you need $92 to trade it.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                   <TableHead className="text-right">Sharpe Ratio</TableHead>
                   <TableHead className="text-right">Return</TableHead>
                   <TableHead className="text-right">Volatility</TableHead>
@@ -111,9 +323,15 @@ export function HierarchicalResults({
               </TableHeader>
               <TableBody>
                 {result.optimizedBlocks.map((block) => {
-                  const blockWeight = result.blockWeights[block.blockName] || 0
+                  const blockWeight = displayBlockWeights[block.blockName] || 0
                   const blockCapital = blockWeight * totalCapital
                   const isExpanded = expandedBlocks.has(block.blockName)
+                  const strategyWeights = displayStrategyWeights[block.blockName] || {}
+
+                  // Skip blocks with no weight (completely filtered out)
+                  if (blockWeight === 0) {
+                    return null
+                  }
 
                   return (
                     <React.Fragment key={block.blockId}>
@@ -174,7 +392,7 @@ export function HierarchicalResults({
 
                       {/* Strategy Rows (shown when expanded) */}
                       {isExpanded &&
-                        Object.entries(block.strategyWeights).map(([strategyName, strategyWeight]) => {
+                        Object.entries(strategyWeights).map(([strategyName, strategyWeight]) => {
                           const combinedWeight = blockWeight * strategyWeight
                           const strategyCapital = combinedWeight * totalCapital
 
@@ -265,23 +483,34 @@ export function HierarchicalResults({
                   <TableHead>Strategy</TableHead>
                   <TableHead>Block</TableHead>
                   <TableHead className="text-right">Total Weight</TableHead>
-                  <TableHead className="text-right">Capital Allocation</TableHead>
+                  <TableHead className="text-right">
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="cursor-help underline decoration-dotted">Capital Allocation</span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">
+                            This represents <strong>portfolio weight in dollars</strong>, not deployable capital or margin requirements.
+                            For example, $92 means this strategy contributes 0.092% to your portfolio&apos;s returns, not that you need $92 to trade it.
+                          </p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {result.optimizedBlocks.map((block) => {
-                  const blockWeight = result.blockWeights[block.blockName] || 0
-
-                  return Object.entries(block.strategyWeights).map(([strategyName, strategyWeight]) => {
-                    const totalWeight = blockWeight * strategyWeight
-                    const capital = totalWeight * totalCapital
+                {Object.entries(displayAllocation).flatMap(([blockName, strategies]) =>
+                  Object.entries(strategies).map(([strategyName, weight]) => {
+                    const capital = weight * totalCapital
 
                     return (
-                      <TableRow key={`${block.blockId}-${strategyName}`}>
+                      <TableRow key={`${blockName}-${strategyName}`}>
                         <TableCell className="font-medium">{strategyName}</TableCell>
-                        <TableCell className="text-muted-foreground">{block.blockName}</TableCell>
+                        <TableCell className="text-muted-foreground">{blockName}</TableCell>
                         <TableCell className="text-right font-mono font-semibold">
-                          {formatPercent(totalWeight)}
+                          {formatPercent(weight)}
                         </TableCell>
                         <TableCell className="text-right font-mono">
                           {formatCurrency(capital)}
@@ -289,7 +518,7 @@ export function HierarchicalResults({
                       </TableRow>
                     )
                   })
-                })}
+                )}
               </TableBody>
             </Table>
           </div>
